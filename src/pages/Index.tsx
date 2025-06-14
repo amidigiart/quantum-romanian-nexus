@@ -13,6 +13,8 @@ import { SystemMetrics } from '@/components/SystemMetrics';
 import { QuantumAlgorithms } from '@/components/QuantumAlgorithms';
 import { QuantumCryptography } from '@/components/QuantumCryptography';
 import { QuantumML } from '@/components/QuantumML';
+import { UserProfile } from '@/components/UserProfile';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 
 const Index = () => {
   const [sensorData, setSensorData] = useState({
@@ -74,52 +76,59 @@ const Index = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 text-white">
-      <QuantumParticles />
+    <ProtectedRoute>
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 text-white">
+        <QuantumParticles />
 
-      <div className="container mx-auto px-4 py-6 relative z-10">
-        <Header />
+        <div className="container mx-auto px-4 py-6 relative z-10">
+          <Header />
 
-        {/* Main Dashboard */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* Chat Interface */}
-          <div className="lg:col-span-2">
-            <ChatInterface />
+          {/* User Profile */}
+          <div className="mb-6">
+            <UserProfile />
           </div>
 
-          {/* System Status */}
-          <div className="space-y-6">
-            <SystemMetrics metrics={quantumMetrics} />
-            <QuantumStatus metrics={quantumMetrics} />
-            <ConnectivityStatus />
+          {/* Main Dashboard */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            {/* Chat Interface */}
+            <div className="lg:col-span-2">
+              <ChatInterface />
+            </div>
+
+            {/* System Status */}
+            <div className="space-y-6">
+              <SystemMetrics metrics={quantumMetrics} />
+              <QuantumStatus metrics={quantumMetrics} />
+              <ConnectivityStatus />
+            </div>
           </div>
+
+          {/* IoT Sensors Dashboard */}
+          <SensorDashboard sensorData={sensorData} />
+
+          {/* Enhanced Quantum Computing Section */}
+          <div className="grid grid-cols-1 gap-6 mb-8">
+            <QuantumAlgorithms />
+            <QuantumML />
+            <QuantumCryptography />
+          </div>
+
+          {/* Quantum Circuit Simulator */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <QuantumCircuit />
+            <RealTimeAnalytics quantumMetrics={quantumMetrics} />
+          </div>
+
+          {/* System Logs */}
+          <SystemLogs logs={systemLogs} />
+
+          {/* Footer */}
+          <footer className="text-center text-gray-400">
+            <p>&copy; 2024 Chatbot Cuantic Român. Tehnologie avansată pentru viitorul cuantic.</p>
+          </footer>
         </div>
-
-        {/* IoT Sensors Dashboard */}
-        <SensorDashboard sensorData={sensorData} />
-
-        {/* Enhanced Quantum Computing Section */}
-        <div className="grid grid-cols-1 gap-6 mb-8">
-          <QuantumAlgorithms />
-          <QuantumML />
-          <QuantumCryptography />
-        </div>
-
-        {/* Quantum Circuit Simulator */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <QuantumCircuit />
-          <RealTimeAnalytics quantumMetrics={quantumMetrics} />
-        </div>
-
-        {/* System Logs */}
-        <SystemLogs logs={systemLogs} />
-
-        {/* Footer */}
-        <footer className="text-center text-gray-400">
-          <p>&copy; 2024 Chatbot Cuantic Român. Tehnologie avansată pentru viitorul cuantic.</p>
-        </footer>
       </div>
-    </div>
+    </ProtectedRoute>
   );
 };
 
