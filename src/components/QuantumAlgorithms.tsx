@@ -8,6 +8,7 @@ import { AlgorithmGrid } from '@/components/quantum-algorithms/AlgorithmGrid';
 import { SearchInterface } from '@/components/quantum-algorithms/SearchInterface';
 import { ResultsDisplay } from '@/components/quantum-algorithms/ResultsDisplay';
 import { VQEOptimizer } from '@/components/VQEOptimizer';
+import { QAOAPreprocessor } from '@/components/QAOAPreprocessor';
 import { useQuantumAlgorithms } from '@/hooks/useQuantumAlgorithms';
 
 export const QuantumAlgorithms = () => {
@@ -35,9 +36,10 @@ export const QuantumAlgorithms = () => {
       </div>
 
       <Tabs defaultValue="algorithms" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 bg-white/10 backdrop-blur-lg border-white/20">
+        <TabsList className="grid w-full grid-cols-4 bg-white/10 backdrop-blur-lg border-white/20">
           <TabsTrigger value="algorithms">Algoritmi</TabsTrigger>
           <TabsTrigger value="vqe">VQE Optimizer</TabsTrigger>
+          <TabsTrigger value="qaoa">QAOA Preprocessor</TabsTrigger>
           <TabsTrigger value="results">Rezultate</TabsTrigger>
         </TabsList>
 
@@ -58,6 +60,10 @@ export const QuantumAlgorithms = () => {
 
         <TabsContent value="vqe" className="mt-6">
           <VQEOptimizer />
+        </TabsContent>
+
+        <TabsContent value="qaoa" className="mt-6">
+          <QAOAPreprocessor />
         </TabsContent>
 
         <TabsContent value="results" className="mt-6">
