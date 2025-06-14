@@ -15,6 +15,7 @@ import { QuantumAlgorithms } from '@/components/QuantumAlgorithms';
 import { QuantumCryptography } from '@/components/QuantumCryptography';
 import { QuantumML } from '@/components/QuantumML';
 import { QuantumNewsFeed } from '@/components/QuantumNewsFeed';
+import { QuantumInternetSimulator } from '@/components/QuantumInternetSimulator';
 import { UserProfile } from '@/components/UserProfile';
 import { UserPreferencesSettings } from '@/components/UserPreferencesSettings';
 import { AdminPanel } from '@/components/AdminPanel';
@@ -129,6 +130,11 @@ const Index = () => {
                     <QuantumStatus metrics={quantumMetrics} />
                     <ConnectivityStatus />
                   </div>
+                </div>
+
+                {/* Quantum Internet Simulator */}
+                <div className="mb-8">
+                  <QuantumInternetSimulator />
                 </div>
 
                 {/* Quantum News Feed */}
