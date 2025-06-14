@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Users, Plus, Crown, Shield, User } from 'lucide-react';
 import { useTeams } from '@/hooks/useTeams';
+import { Team } from '@/types/team';
 
 export const TeamManager = () => {
   const { teams, teamMemberships, loading, createTeam, loadTeamMemberships, setCurrentTeam } = useTeams();
@@ -26,7 +26,7 @@ export const TeamManager = () => {
     }
   };
 
-  const handleSelectTeam = async (team: any) => {
+  const handleSelectTeam = async (team: Team) => {
     setCurrentTeam(team);
     await loadTeamMemberships(team.id);
   };
