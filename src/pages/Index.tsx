@@ -1,31 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { Header } from '@/components/Header';
 import { QuantumParticles } from '@/components/QuantumParticles';
-import { QuantumStatus } from '@/components/QuantumStatus';
-import { ConnectivityStatus } from '@/components/ConnectivityStatus';
-import { RealTimeAnalytics } from '@/components/RealTimeAnalytics';
-import { SystemLogs } from '@/components/SystemLogs';
-import { QuantumCircuit } from '@/components/QuantumCircuit';
-import { SensorDashboard } from '@/components/SensorDashboard';
-import { ChatInterface } from '@/components/ChatInterface';
-import { ChatSidebar } from '@/components/ChatSidebar';
-import { SystemMetrics } from '@/components/SystemMetrics';
-import { QuantumAlgorithms } from '@/components/QuantumAlgorithms';
-import { QuantumCryptography } from '@/components/QuantumCryptography';
-import { QuantumML } from '@/components/QuantumML';
-import { QuantumNewsFeed } from '@/components/QuantumNewsFeed';
-import { QuantumInternetSimulator } from '@/components/QuantumInternetSimulator';
-import { UserProfile } from '@/components/UserProfile';
-import { UserPreferencesSettings } from '@/components/UserPreferencesSettings';
-import { AdminPanel } from '@/components/AdminPanel';
-import { TeamManager } from '@/components/TeamManager';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { QuantumChemistryLab } from '@/components/QuantumChemistryLab';
-import { FinancialQuantumOptimizer } from '@/components/FinancialQuantumOptimizer';
-import { QuantumWeatherPrediction } from '@/components/QuantumWeatherPrediction';
-import { QuantumSupremacyBenchmarks } from '@/components/QuantumSupremacyBenchmarks';
-import { QuantumErrorCorrection } from '@/components/QuantumErrorCorrection';
+import { UserSection } from '@/components/dashboard/UserSection';
+import { TabNavigation } from '@/components/dashboard/TabNavigation';
 
 const Index = () => {
   const [sensorData, setSensorData] = useState({
@@ -95,111 +74,14 @@ const Index = () => {
           <Header />
 
           {/* User Profile and Preferences */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            <UserProfile />
-            <UserPreferencesSettings />
-          </div>
+          <UserSection />
 
-          {/* Admin and Team Management */}
-          <div className="mb-8">
-            <Tabs defaultValue="dashboard" className="w-full">
-              <TabsList className="grid w-full grid-cols-3 bg-white/10 backdrop-blur-lg border-white/20">
-                <TabsTrigger value="dashboard" className="data-[state=active]:bg-cyan-500/20">
-                  Dashboard Principal
-                </TabsTrigger>
-                <TabsTrigger value="admin" className="data-[state=active]:bg-cyan-500/20">
-                  Administrare
-                </TabsTrigger>
-                <TabsTrigger value="teams" className="data-[state=active]:bg-cyan-500/20">
-                  Echipe
-                </TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="dashboard" className="mt-6">
-                {/* Main Dashboard */}
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
-                  {/* Chat Sidebar */}
-                  <div className="lg:col-span-1">
-                    <ChatSidebar />
-                  </div>
-
-                  {/* Chat Interface */}
-                  <div className="lg:col-span-2">
-                    <ChatInterface />
-                  </div>
-
-                  {/* System Status */}
-                  <div className="lg:col-span-1 space-y-6">
-                    <SystemMetrics metrics={quantumMetrics} />
-                    <QuantumStatus metrics={quantumMetrics} />
-                    <ConnectivityStatus />
-                  </div>
-                </div>
-
-                {/* Quantum Error Correction Breakthroughs */}
-                <div className="mb-8">
-                  <QuantumErrorCorrection />
-                </div>
-
-                {/* Quantum Supremacy Benchmarks */}
-                <div className="mb-8">
-                  <QuantumSupremacyBenchmarks />
-                </div>
-
-                {/* Financial Quantum Optimizer */}
-                <div className="mb-8">
-                  <FinancialQuantumOptimizer />
-                </div>
-
-                {/* Quantum Weather Prediction */}
-                <div className="mb-8">
-                  <QuantumWeatherPrediction />
-                </div>
-
-                {/* Quantum Internet Simulator */}
-                <div className="mb-8">
-                  <QuantumInternetSimulator />
-                </div>
-
-                {/* Quantum Chemistry Lab */}
-                <div className="mb-8">
-                  <QuantumChemistryLab />
-                </div>
-
-                {/* Quantum News Feed */}
-                <div className="mb-8">
-                  <QuantumNewsFeed />
-                </div>
-
-                {/* IoT Sensors Dashboard */}
-                <SensorDashboard sensorData={sensorData} />
-
-                {/* Enhanced Quantum Computing Section */}
-                <div className="grid grid-cols-1 gap-6 mb-8">
-                  <QuantumAlgorithms />
-                  <QuantumML />
-                  <QuantumCryptography />
-                </div>
-
-                {/* Quantum Circuit Simulator */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                  <QuantumCircuit />
-                  <RealTimeAnalytics quantumMetrics={quantumMetrics} />
-                </div>
-
-                {/* System Logs */}
-                <SystemLogs logs={systemLogs} />
-              </TabsContent>
-              
-              <TabsContent value="admin" className="mt-6">
-                <AdminPanel />
-              </TabsContent>
-              
-              <TabsContent value="teams" className="mt-6">
-                <TeamManager />
-              </TabsContent>
-            </Tabs>
-          </div>
+          {/* Main Navigation Tabs */}
+          <TabNavigation 
+            sensorData={sensorData}
+            quantumMetrics={quantumMetrics}
+            systemLogs={systemLogs}
+          />
 
           {/* Footer */}
           <footer className="text-center text-gray-400">
