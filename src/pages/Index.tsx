@@ -14,6 +14,7 @@ import { SystemMetrics } from '@/components/SystemMetrics';
 import { QuantumAlgorithms } from '@/components/QuantumAlgorithms';
 import { QuantumCryptography } from '@/components/QuantumCryptography';
 import { QuantumML } from '@/components/QuantumML';
+import { QuantumNewsFeed } from '@/components/QuantumNewsFeed';
 import { UserProfile } from '@/components/UserProfile';
 import { UserPreferencesSettings } from '@/components/UserPreferencesSettings';
 import { AdminPanel } from '@/components/AdminPanel';
@@ -128,6 +129,11 @@ const Index = () => {
                     <QuantumStatus metrics={quantumMetrics} />
                     <ConnectivityStatus />
                   </div>
+                </div>
+
+                {/* Quantum News Feed */}
+                <div className="mb-8">
+                  <QuantumNewsFeed />
                 </div>
 
                 {/* IoT Sensors Dashboard */}
