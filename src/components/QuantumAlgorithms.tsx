@@ -1,14 +1,16 @@
+
 import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Atom, Zap, GitBranch } from 'lucide-react';
+import { Atom, Zap, GitBranch, Satellite } from 'lucide-react';
 import { AlgorithmGrid } from '@/components/quantum-algorithms/AlgorithmGrid';
 import { SearchInterface } from '@/components/quantum-algorithms/SearchInterface';
 import { ResultsDisplay } from '@/components/quantum-algorithms/ResultsDisplay';
 import { VQEOptimizer } from '@/components/VQEOptimizer';
 import { QAOAPreprocessor } from '@/components/QAOAPreprocessor';
 import { HybridAlgorithmShowcase } from '@/components/HybridAlgorithmShowcase';
+import { SatelliteQKDSimulator } from '@/components/SatelliteQKDSimulator';
 import { useQuantumAlgorithms } from '@/hooks/useQuantumAlgorithms';
 
 export const QuantumAlgorithms = () => {
@@ -36,11 +38,12 @@ export const QuantumAlgorithms = () => {
       </div>
 
       <Tabs defaultValue="algorithms" className="w-full">
-        <TabsList className="grid w-full grid-cols-5 bg-white/10 backdrop-blur-lg border-white/20">
+        <TabsList className="grid w-full grid-cols-6 bg-white/10 backdrop-blur-lg border-white/20">
           <TabsTrigger value="algorithms">Algoritmi</TabsTrigger>
           <TabsTrigger value="hybrid">Hibrizi</TabsTrigger>
           <TabsTrigger value="vqe">VQE Optimizer</TabsTrigger>
           <TabsTrigger value="qaoa">QAOA Preprocessor</TabsTrigger>
+          <TabsTrigger value="satellite">Satelit QKD</TabsTrigger>
           <TabsTrigger value="results">Rezultate</TabsTrigger>
         </TabsList>
 
@@ -69,6 +72,10 @@ export const QuantumAlgorithms = () => {
 
         <TabsContent value="qaoa" className="mt-6">
           <QAOAPreprocessor />
+        </TabsContent>
+
+        <TabsContent value="satellite" className="mt-6">
+          <SatelliteQKDSimulator />
         </TabsContent>
 
         <TabsContent value="results" className="mt-6">
