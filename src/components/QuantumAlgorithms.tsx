@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +11,7 @@ import { QAOAPreprocessor } from '@/components/QAOAPreprocessor';
 import { HybridAlgorithmShowcase } from '@/components/HybridAlgorithmShowcase';
 import { SatelliteQKDSimulator } from '@/components/SatelliteQKDSimulator';
 import { QuantumTeleportationLab } from '@/components/QuantumTeleportationLab';
+import { QuantumRepeaterOptimizer } from '@/components/QuantumRepeaterOptimizer';
 import { useQuantumAlgorithms } from '@/hooks/useQuantumAlgorithms';
 
 export const QuantumAlgorithms = () => {
@@ -39,13 +39,14 @@ export const QuantumAlgorithms = () => {
       </div>
 
       <Tabs defaultValue="algorithms" className="w-full">
-        <TabsList className="grid w-full grid-cols-7 bg-white/10 backdrop-blur-lg border-white/20">
+        <TabsList className="grid w-full grid-cols-8 bg-white/10 backdrop-blur-lg border-white/20">
           <TabsTrigger value="algorithms">Algoritmi</TabsTrigger>
           <TabsTrigger value="hybrid">Hibrizi</TabsTrigger>
           <TabsTrigger value="vqe">VQE</TabsTrigger>
           <TabsTrigger value="qaoa">QAOA</TabsTrigger>
           <TabsTrigger value="satellite">Satelit QKD</TabsTrigger>
           <TabsTrigger value="teleportation">Teleportare</TabsTrigger>
+          <TabsTrigger value="repeater">Repeater Net</TabsTrigger>
           <TabsTrigger value="results">Rezultate</TabsTrigger>
         </TabsList>
 
@@ -82,6 +83,10 @@ export const QuantumAlgorithms = () => {
 
         <TabsContent value="teleportation" className="mt-6">
           <QuantumTeleportationLab />
+        </TabsContent>
+
+        <TabsContent value="repeater" className="mt-6">
+          <QuantumRepeaterOptimizer />
         </TabsContent>
 
         <TabsContent value="results" className="mt-6">
