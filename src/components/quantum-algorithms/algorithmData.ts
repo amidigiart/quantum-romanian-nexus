@@ -9,7 +9,9 @@ export const algorithms: Algorithm[] = [
     icon: Search,
     description: 'Căutare cuantică în baze de date nesortate',
     complexity: 'O(√N)',
-    color: 'text-blue-400'
+    color: 'text-blue-400',
+    category: 'Search',
+    qubits: 4
   },
   {
     id: 'shor',
@@ -17,7 +19,9 @@ export const algorithms: Algorithm[] = [
     icon: Lock,
     description: 'Factorizarea numerelor întregi mari',
     complexity: 'O((log N)³)',
-    color: 'text-red-400'
+    color: 'text-red-400',
+    category: 'Factoring',
+    qubits: 8
   },
   {
     id: 'qaoa',
@@ -25,7 +29,9 @@ export const algorithms: Algorithm[] = [
     icon: Target,
     description: 'Algoritm de optimizare cuantică aproximativă',
     complexity: 'O(p·m)',
-    color: 'text-green-400'
+    color: 'text-green-400',
+    category: 'Optimization',
+    qubits: 6
   },
   {
     id: 'vqe',
@@ -33,7 +39,9 @@ export const algorithms: Algorithm[] = [
     icon: Zap,
     description: 'Estimarea energiei stării fundamentale',
     complexity: 'O(N⁴)',
-    color: 'text-yellow-400'
+    color: 'text-yellow-400',
+    category: 'Chemistry',
+    qubits: 4
   },
   {
     id: 'qml',
@@ -41,7 +49,9 @@ export const algorithms: Algorithm[] = [
     icon: Brain,
     description: 'Învățare automată cuantică hibridă',
     complexity: 'O(log N)',
-    color: 'text-purple-400'
+    color: 'text-purple-400',
+    category: 'Machine Learning',
+    qubits: 5
   },
   {
     id: 'qrng',
@@ -49,7 +59,9 @@ export const algorithms: Algorithm[] = [
     icon: Shuffle,
     description: 'Generator de numere aleatoare cuantice',
     complexity: 'O(1)',
-    color: 'text-cyan-400'
+    color: 'text-cyan-400',
+    category: 'Utility',
+    qubits: 2
   },
   {
     id: 'qft',
@@ -57,7 +69,9 @@ export const algorithms: Algorithm[] = [
     icon: Calculator,
     description: 'Transformata Fourier cuantică',
     complexity: 'O((log N)²)',
-    color: 'text-orange-400'
+    color: 'text-orange-400',
+    category: 'Transform',
+    qubits: 6
   },
   {
     id: 'qec',
@@ -65,7 +79,9 @@ export const algorithms: Algorithm[] = [
     icon: Shield,
     description: 'Corecția erorilor cuantice',
     complexity: 'O(n³)',
-    color: 'text-pink-400'
+    color: 'text-pink-400',
+    category: 'Error Correction',
+    qubits: 9
   },
   {
     id: 'qsim',
@@ -73,7 +89,9 @@ export const algorithms: Algorithm[] = [
     icon: Cpu,
     description: 'Simularea sistemelor cuantice complexe',
     complexity: 'O(2ⁿ)',
-    color: 'text-indigo-400'
+    color: 'text-indigo-400',
+    category: 'Simulation',
+    qubits: 7
   },
   {
     id: 'qopt',
@@ -81,6 +99,8 @@ export const algorithms: Algorithm[] = [
     icon: TrendingUp,
     description: 'Optimizarea portofoliului de investiții',
     complexity: 'O(N·M)',
-    color: 'text-emerald-400'
+    color: 'text-emerald-400',
+    category: 'Finance',
+    qubits: 5
   }
 ];

@@ -24,6 +24,10 @@ export const useQuantumAlgorithms = () => {
 
     const result: AlgorithmResult = {
       id: Date.now().toString(),
+      name: algorithm.name,
+      result: `Executat cu succes: ${algorithm.name}`,
+      complexity: algorithm.complexity,
+      status: 'completed' as const,
       algorithmName: algorithm.name,
       timestamp: new Date(),
       executionTime: Math.random() * 5000 + 1000,
