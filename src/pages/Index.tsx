@@ -25,6 +25,7 @@ import { QuantumChemistryLab } from '@/components/QuantumChemistryLab';
 import { FinancialQuantumOptimizer } from '@/components/FinancialQuantumOptimizer';
 import { QuantumWeatherPrediction } from '@/components/QuantumWeatherPrediction';
 import { QuantumSupremacyBenchmarks } from '@/components/QuantumSupremacyBenchmarks';
+import { QuantumErrorCorrection } from '@/components/QuantumErrorCorrection';
 
 const Index = () => {
   const [sensorData, setSensorData] = useState({
@@ -133,6 +134,11 @@ const Index = () => {
                     <QuantumStatus metrics={quantumMetrics} />
                     <ConnectivityStatus />
                   </div>
+                </div>
+
+                {/* Quantum Error Correction Breakthroughs */}
+                <div className="mb-8">
+                  <QuantumErrorCorrection />
                 </div>
 
                 {/* Quantum Supremacy Benchmarks */}
