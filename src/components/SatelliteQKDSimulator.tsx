@@ -24,7 +24,8 @@ interface SatelliteNode {
   id: string;
   name: string;
   type: 'satellite' | 'ground_station';
-  position: { x: number; y: number; altitude?: number };
+  position: { x: number; y: number };
+  altitude?: number;
   orbital_period?: number;
   coverage_radius: number;
   status: 'active' | 'inactive' | 'transmitting';
