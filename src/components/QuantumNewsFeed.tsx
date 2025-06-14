@@ -2,7 +2,8 @@
 import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Rss, RefreshCw } from 'lucide-react';
+import { Rss, RefreshCw, Bot } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { useQuantumNews } from '@/hooks/useQuantumNews';
 import { NewsArticle } from '@/components/NewsArticle';
 import { NewsFeedHeader } from '@/components/NewsFeedHeader';
@@ -13,11 +14,20 @@ export const QuantumNewsFeed = () => {
   return (
     <Card className="bg-white/10 backdrop-blur-lg border-white/20">
       <CardHeader>
-        <NewsFeedHeader 
-          lastUpdated={lastUpdated}
-          loading={loading}
-          onRefresh={fetchQuantumNews}
-        />
+        <div className="flex items-center justify-between">
+          <NewsFeedHeader 
+            lastUpdated={lastUpdated}
+            loading={loading}
+            onRefresh={fetchQuantumNews}
+          />
+          <Badge variant="outline" className="border-green-400 text-green-400 ml-2">
+            <Bot className="w-3 h-3 mr-1" />
+            Integrat AI
+          </Badge>
+        </div>
+        <p className="text-sm text-gray-400 mt-2">
+          Știrile sunt integrate în timp real cu asistentul cuantic pentru răspunsuri contextuale actualizate.
+        </p>
       </CardHeader>
       <CardContent>
         {loading && articles.length === 0 ? (
