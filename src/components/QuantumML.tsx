@@ -11,6 +11,8 @@ import { TrainingProgress } from '@/components/TrainingProgress';
 import { HybridStrategy } from '@/components/HybridStrategy';
 import { QuantumCircuitPanel } from '@/components/QuantumCircuitPanel';
 import { TrainingAnalytics } from '@/components/TrainingAnalytics';
+import { NeuralNetworkArchitecture } from '@/components/NeuralNetworkArchitecture';
+import { AdvancedTrainingOptimizer } from '@/components/AdvancedTrainingOptimizer';
 
 export const QuantumML = () => {
   const {
@@ -30,6 +32,11 @@ export const QuantumML = () => {
 
   const currentModel = models[activeModel];
 
+  const handleOptimizerSettings = (settings: any) => {
+    console.log('Optimizer settings updated:', settings);
+    // Here you would integrate the optimizer settings with your training logic
+  };
+
   return (
     <Card className="bg-white/10 backdrop-blur-lg border-white/20 p-6">
       <div className="flex items-center gap-2 mb-6">
@@ -37,15 +44,17 @@ export const QuantumML = () => {
         <h3 className="text-2xl font-bold text-white">Hybrid Quantum-Classical ML</h3>
         <Badge variant="outline" className="border-purple-400 text-purple-400 ml-auto">
           <GitBranch className="w-3 h-3 mr-1" />
-          Hibrid Avansat
+          Neural Enhanced
         </Badge>
       </div>
 
       <Tabs defaultValue="models" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 bg-white/10 backdrop-blur-lg border-white/20">
+        <TabsList className="grid w-full grid-cols-6 bg-white/10 backdrop-blur-lg border-white/20">
           <TabsTrigger value="models">Modele</TabsTrigger>
-          <TabsTrigger value="hybrid">Integrare Hibridă</TabsTrigger>
-          <TabsTrigger value="quantum-circuit">Circuit Cuantic</TabsTrigger>
+          <TabsTrigger value="architecture">Arhitectură</TabsTrigger>
+          <TabsTrigger value="optimizer">Optimizator</TabsTrigger>
+          <TabsTrigger value="hybrid">Hibrid</TabsTrigger>
+          <TabsTrigger value="quantum-circuit">Circuit</TabsTrigger>
           <TabsTrigger value="analytics">Analiză</TabsTrigger>
         </TabsList>
 
@@ -68,6 +77,20 @@ export const QuantumML = () => {
             isTraining={isTraining}
             trainingProgress={trainingProgress}
             currentModel={currentModel}
+          />
+        </TabsContent>
+
+        <TabsContent value="architecture" className="mt-6">
+          <NeuralNetworkArchitecture
+            currentModel={currentModel}
+            isTraining={isTraining}
+          />
+        </TabsContent>
+
+        <TabsContent value="optimizer" className="mt-6">
+          <AdvancedTrainingOptimizer
+            isTraining={isTraining}
+            onSettingsChange={handleOptimizerSettings}
           />
         </TabsContent>
 

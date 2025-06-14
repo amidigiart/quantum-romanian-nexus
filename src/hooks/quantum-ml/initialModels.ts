@@ -53,5 +53,57 @@ export const createInitialModels = (): Record<string, MLModel> => ({
     quantumLayers: 8,
     classicalLayers: 6,
     hybridEfficiency: 0
+  },
+  qgan: {
+    name: 'Quantum-Classical GAN',
+    type: 'classification',
+    accuracy: 0,
+    quantumAccuracy: 0,
+    classicalAccuracy: 0,
+    loss: 1.0,
+    epochs: 0,
+    status: 'idle',
+    quantumLayers: 7,
+    classicalLayers: 12,
+    hybridEfficiency: 0
+  },
+  qresnet: {
+    name: 'Quantum ResNet Hybrid',
+    type: 'classification',
+    accuracy: 0,
+    quantumAccuracy: 0,
+    classicalAccuracy: 0,
+    loss: 1.0,
+    epochs: 0,
+    status: 'idle',
+    quantumLayers: 9,
+    classicalLayers: 15,
+    hybridEfficiency: 0
+  },
+  qbert: {
+    name: 'Quantum-Enhanced BERT',
+    type: 'optimization',
+    accuracy: 0,
+    quantumAccuracy: 0,
+    classicalAccuracy: 0,
+    loss: 1.0,
+    epochs: 0,
+    status: 'idle',
+    quantumLayers: 12,
+    classicalLayers: 24,
+    hybridEfficiency: 0
+  },
+  qensemble: {
+    name: 'Quantum Ensemble Network',
+    type: 'classification',
+    accuracy: 0,
+    quantumAccuracy: 0,
+    classicalAccuracy: 0,
+    loss: 1.0,
+    epochs: 0,
+    status: 'idle',
+    quantumLayers: 16,
+    classicalLayers: 8,
+    hybridEfficiency: 0
   }
 });
