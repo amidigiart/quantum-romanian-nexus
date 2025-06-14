@@ -5,18 +5,14 @@ import { Algorithm } from './types';
 
 interface AlgorithmGridProps {
   algorithms: Algorithm[];
-  selectedAlgorithm: Algorithm | null;
-  setSelectedAlgorithm: (algorithm: Algorithm | null) => void;
-  onRunAlgorithm: (algorithm: Algorithm) => Promise<void>;
-  isRunning: boolean;
+  activeAlgorithm: string | null;
+  onExecuteAlgorithm: (algorithmId: string) => void;
 }
 
 export const AlgorithmGrid: React.FC<AlgorithmGridProps> = ({
   algorithms,
-  selectedAlgorithm,
-  setSelectedAlgorithm,
-  onRunAlgorithm,
-  isRunning
+  activeAlgorithm,
+  onExecuteAlgorithm
 }) => {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
@@ -24,13 +20,10 @@ export const AlgorithmGrid: React.FC<AlgorithmGridProps> = ({
         <Button
           key={algorithm.id}
           variant="outline"
-          onClick={() => {
-            setSelectedAlgorithm(algorithm);
-            onRunAlgorithm(algorithm);
-          }}
-          disabled={isRunning && selectedAlgorithm?.id === algorithm.id}
+          onClick={() => onExecuteAlgorithm(algorithm.id)}
+          disabled={activeAlgorithm === algorithm.id}
           className={`flex flex-col items-center gap-2 p-4 h-auto border-white/30 text-white hover:bg-white/20 transition-all hover:scale-105 ${
-            isRunning && selectedAlgorithm?.id === algorithm.id ? 'bg-white/20 animate-pulse' : ''
+            activeAlgorithm === algorithm.id ? 'bg-white/20 animate-pulse' : ''
           }`}
           title={algorithm.description}
         >
