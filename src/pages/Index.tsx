@@ -19,12 +19,17 @@ import {
   Brain,
   Send,
   Info,
-  BarChart3
+  BarChart3,
+  Shield,
+  Lock
 } from 'lucide-react';
 import { QuantumCircuit } from '@/components/QuantumCircuit';
 import { SensorDashboard } from '@/components/SensorDashboard';
 import { ChatInterface } from '@/components/ChatInterface';
 import { SystemMetrics } from '@/components/SystemMetrics';
+import { QuantumAlgorithms } from '@/components/QuantumAlgorithms';
+import { QuantumCryptography } from '@/components/QuantumCryptography';
+import { QuantumML } from '@/components/QuantumML';
 
 const Index = () => {
   const [sensorData, setSensorData] = useState({
@@ -160,6 +165,18 @@ const Index = () => {
         {/* IoT Sensors Dashboard */}
         <SensorDashboard sensorData={sensorData} />
 
+        {/* Enhanced Quantum Computing Section */}
+        <div className="grid grid-cols-1 gap-6 mb-8">
+          {/* Quantum Algorithms */}
+          <QuantumAlgorithms />
+          
+          {/* Quantum Machine Learning */}
+          <QuantumML />
+          
+          {/* Quantum Cryptography */}
+          <QuantumCryptography />
+        </div>
+
         {/* Quantum Circuit Simulator */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <QuantumCircuit />
@@ -186,6 +203,10 @@ const Index = () => {
                     <span className="text-gray-300">Fidelitate:</span>
                     <span className="text-green-400 font-bold">91.5%</span>
                   </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-300">Algoritmi Activi:</span>
+                    <span className="text-yellow-400 font-bold">5</span>
+                  </div>
                 </div>
               </div>
               <div className="bg-black/30 rounded-lg p-4">
@@ -198,6 +219,19 @@ const Index = () => {
                   <div className="text-center p-2 bg-yellow-500/20 rounded">
                     <div className="text-yellow-400 font-bold">3</div>
                     <div className="text-gray-300">Standby</div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-black/30 rounded-lg p-4">
+                <h4 className="text-white font-semibold mb-2">Securitate Cuantică</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-gray-300">Protocoale:</span>
+                    <span className="text-green-400 font-bold">BB84, E91, SARG04</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-300">Chei Generate:</span>
+                    <span className="text-cyan-400 font-bold">1,247</span>
                   </div>
                 </div>
               </div>
