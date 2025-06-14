@@ -58,7 +58,9 @@ export const useUserPreferences = () => {
           quantum_simulation_mode: data.quantum_simulation_mode,
           encryption_protocol: data.encryption_protocol,
           ml_model_preference: data.ml_model_preference,
-          notification_settings: data.notification_settings,
+          notification_settings: typeof data.notification_settings === 'object' && data.notification_settings !== null 
+            ? data.notification_settings as { chat_notifications: boolean; system_alerts: boolean; }
+            : defaultPreferences.notification_settings,
           theme_preference: data.theme_preference
         });
       }
