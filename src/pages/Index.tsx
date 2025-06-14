@@ -14,6 +14,7 @@ import { QuantumAlgorithms } from '@/components/QuantumAlgorithms';
 import { QuantumCryptography } from '@/components/QuantumCryptography';
 import { QuantumML } from '@/components/QuantumML';
 import { UserProfile } from '@/components/UserProfile';
+import { UserPreferencesSettings } from '@/components/UserPreferencesSettings';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 
 const Index = () => {
@@ -83,9 +84,10 @@ const Index = () => {
         <div className="container mx-auto px-4 py-6 relative z-10">
           <Header />
 
-          {/* User Profile */}
-          <div className="mb-6">
+          {/* User Profile and Preferences */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             <UserProfile />
+            <UserPreferencesSettings />
           </div>
 
           {/* Main Dashboard */}

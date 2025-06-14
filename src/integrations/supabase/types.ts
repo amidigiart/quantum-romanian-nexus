@@ -98,6 +98,48 @@ export type Database = {
         }
         Relationships: []
       }
+      user_preferences: {
+        Row: {
+          created_at: string
+          encryption_protocol: string | null
+          id: string
+          ml_model_preference: string | null
+          notification_settings: Json | null
+          preferred_qubit_count: number | null
+          quantum_algorithm_preference: string | null
+          quantum_simulation_mode: string | null
+          theme_preference: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          encryption_protocol?: string | null
+          id?: string
+          ml_model_preference?: string | null
+          notification_settings?: Json | null
+          preferred_qubit_count?: number | null
+          quantum_algorithm_preference?: string | null
+          quantum_simulation_mode?: string | null
+          theme_preference?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          encryption_protocol?: string | null
+          id?: string
+          ml_model_preference?: string | null
+          notification_settings?: Json | null
+          preferred_qubit_count?: number | null
+          quantum_algorithm_preference?: string | null
+          quantum_simulation_mode?: string | null
+          theme_preference?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
