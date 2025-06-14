@@ -1,25 +1,9 @@
-
-import React, { useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import React, { useState } from 'react';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
-import { 
-  Atom, 
-  Flask, 
-  Zap, 
-  Calculator, 
-  RotateCcw, 
-  Play, 
-  Pause, 
-  Download,
-  Microscope,
-  Orbit,
-  Beaker
-} from 'lucide-react';
+import { Beaker, Atom, Zap, RotateCcw, Play, Pause } from 'lucide-react';
 
 interface Molecule {
   name: string;
