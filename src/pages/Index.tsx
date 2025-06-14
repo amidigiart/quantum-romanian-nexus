@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Header } from '@/components/Header';
 import { QuantumParticles } from '@/components/QuantumParticles';
@@ -15,7 +16,10 @@ import { QuantumCryptography } from '@/components/QuantumCryptography';
 import { QuantumML } from '@/components/QuantumML';
 import { UserProfile } from '@/components/UserProfile';
 import { UserPreferencesSettings } from '@/components/UserPreferencesSettings';
+import { AdminPanel } from '@/components/AdminPanel';
+import { TeamManager } from '@/components/TeamManager';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const Index = () => {
   const [sensorData, setSensorData] = useState({
@@ -90,44 +94,71 @@ const Index = () => {
             <UserPreferencesSettings />
           </div>
 
-          {/* Main Dashboard */}
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
-            {/* Chat Sidebar */}
-            <div className="lg:col-span-1">
-              <ChatSidebar />
-            </div>
+          {/* Admin and Team Management */}
+          <div className="mb-8">
+            <Tabs defaultValue="dashboard" className="w-full">
+              <TabsList className="grid w-full grid-cols-3 bg-white/10 backdrop-blur-lg border-white/20">
+                <TabsTrigger value="dashboard" className="data-[state=active]:bg-cyan-500/20">
+                  Dashboard Principal
+                </TabsTrigger>
+                <TabsTrigger value="admin" className="data-[state=active]:bg-cyan-500/20">
+                  Administrare
+                </TabsTrigger>
+                <TabsTrigger value="teams" className="data-[state=active]:bg-cyan-500/20">
+                  Echipe
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="dashboard" className="mt-6">
+                {/* Main Dashboard */}
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+                  {/* Chat Sidebar */}
+                  <div className="lg:col-span-1">
+                    <ChatSidebar />
+                  </div>
 
-            {/* Chat Interface */}
-            <div className="lg:col-span-2">
-              <ChatInterface />
-            </div>
+                  {/* Chat Interface */}
+                  <div className="lg:col-span-2">
+                    <ChatInterface />
+                  </div>
 
-            {/* System Status */}
-            <div className="lg:col-span-1 space-y-6">
-              <SystemMetrics metrics={quantumMetrics} />
-              <QuantumStatus metrics={quantumMetrics} />
-              <ConnectivityStatus />
-            </div>
+                  {/* System Status */}
+                  <div className="lg:col-span-1 space-y-6">
+                    <SystemMetrics metrics={quantumMetrics} />
+                    <QuantumStatus metrics={quantumMetrics} />
+                    <ConnectivityStatus />
+                  </div>
+                </div>
+
+                {/* IoT Sensors Dashboard */}
+                <SensorDashboard sensorData={sensorData} />
+
+                {/* Enhanced Quantum Computing Section */}
+                <div className="grid grid-cols-1 gap-6 mb-8">
+                  <QuantumAlgorithms />
+                  <QuantumML />
+                  <QuantumCryptography />
+                </div>
+
+                {/* Quantum Circuit Simulator */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                  <QuantumCircuit />
+                  <RealTimeAnalytics quantumMetrics={quantumMetrics} />
+                </div>
+
+                {/* System Logs */}
+                <SystemLogs logs={systemLogs} />
+              </TabsContent>
+              
+              <TabsContent value="admin" className="mt-6">
+                <AdminPanel />
+              </TabsContent>
+              
+              <TabsContent value="teams" className="mt-6">
+                <TeamManager />
+              </TabsContent>
+            </Tabs>
           </div>
-
-          {/* IoT Sensors Dashboard */}
-          <SensorDashboard sensorData={sensorData} />
-
-          {/* Enhanced Quantum Computing Section */}
-          <div className="grid grid-cols-1 gap-6 mb-8">
-            <QuantumAlgorithms />
-            <QuantumML />
-            <QuantumCryptography />
-          </div>
-
-          {/* Quantum Circuit Simulator */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            <QuantumCircuit />
-            <RealTimeAnalytics quantumMetrics={quantumMetrics} />
-          </div>
-
-          {/* System Logs */}
-          <SystemLogs logs={systemLogs} />
 
           {/* Footer */}
           <footer className="text-center text-gray-400">
