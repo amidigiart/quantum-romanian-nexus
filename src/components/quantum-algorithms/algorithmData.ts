@@ -1,5 +1,4 @@
-
-import { Brain, Lock, Search, Zap, Calculator, Shuffle, Target, Cpu, Shield, TrendingUp } from 'lucide-react';
+import { Brain, Lock, Search, Zap, Calculator, Shuffle, Target, Cpu, Shield, TrendingUp, Network, Layers, GitBranch, Sparkles, Atom, Database } from 'lucide-react';
 import { Algorithm } from './types';
 
 export const algorithms: Algorithm[] = [
@@ -102,5 +101,85 @@ export const algorithms: Algorithm[] = [
     color: 'text-emerald-400',
     category: 'Finance',
     qubits: 5
+  },
+  {
+    id: 'hybrid-qaoa-vqe',
+    name: 'Hybrid QAOA-VQE',
+    icon: GitBranch,
+    description: 'Combinație adaptivă QAOA și VQE pentru optimizare complexă',
+    complexity: 'O(p·N⁴)',
+    color: 'text-teal-400',
+    category: 'Hybrid Optimization',
+    qubits: 8
+  },
+  {
+    id: 'quantum-annealing-hybrid',
+    name: 'Quantum Annealing Hybrid',
+    icon: Sparkles,
+    description: 'Hibrid între annealing cuantic și optimizare clasică',
+    complexity: 'O(T·log N)',
+    color: 'text-violet-400',
+    category: 'Hybrid Annealing',
+    qubits: 12
+  },
+  {
+    id: 'variational-quantum-eigensolver-plus',
+    name: 'VQE+ Enhanced',
+    icon: Atom,
+    description: 'VQE îmbunătățit cu tehnici de învățare adaptivă',
+    complexity: 'O(N⁴·log p)',
+    color: 'text-amber-400',
+    category: 'Enhanced Chemistry',
+    qubits: 6
+  },
+  {
+    id: 'quantum-approximate-counting',
+    name: 'Q-Approximate Counting',
+    icon: Calculator,
+    description: 'Numărare aproximativă cu accelerare cuantică',
+    complexity: 'O(√N/ε)',
+    color: 'text-lime-400',
+    category: 'Counting',
+    qubits: 5
+  },
+  {
+    id: 'hybrid-neural-quantum',
+    name: 'Neural-Quantum Hybrid',
+    icon: Network,
+    description: 'Rețele neurale cu straturi cuantice integrate',
+    complexity: 'O(L·N·log M)',
+    color: 'text-rose-400',
+    category: 'Hybrid ML',
+    qubits: 10
+  },
+  {
+    id: 'quantum-reinforcement-learning',
+    name: 'Quantum RL',
+    icon: Brain,
+    description: 'Învățare prin întărire cu avantaj cuantic',
+    complexity: 'O(S·A·log H)',
+    color: 'text-fuchsia-400',
+    category: 'Quantum RL',
+    qubits: 7
+  },
+  {
+    id: 'adaptive-qaoa',
+    name: 'Adaptive QAOA',
+    icon: Layers,
+    description: 'QAOA cu strategie adaptivă de parametri',
+    complexity: 'O(p²·m)',
+    color: 'text-sky-400',
+    category: 'Adaptive Optimization',
+    qubits: 9
+  },
+  {
+    id: 'quantum-database-search',
+    name: 'Q-Database Search',
+    icon: Database,
+    description: 'Căutare hibridă în baze de date mari',
+    complexity: 'O(√N·log D)',
+    color: 'text-emerald-500',
+    category: 'Database',
+    qubits: 6
   }
 ];
