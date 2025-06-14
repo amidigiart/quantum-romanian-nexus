@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,13 +7,6 @@ import { Badge } from '@/components/ui/badge';
 import { Bot, Send, Info, Atom, Microchip, User, Brain, Shield, Calculator } from 'lucide-react';
 import { useChat, ChatMessage } from '@/hooks/useChat';
 import { useAuth } from '@/hooks/useAuth';
-
-interface ChatMessage {
-  id: string;
-  text: string;
-  isBot: boolean;
-  timestamp: Date;
-}
 
 export const ChatInterface = () => {
   const { user } = useAuth();
