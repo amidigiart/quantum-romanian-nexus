@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Header } from '@/components/Header';
 import { QuantumParticles } from '@/components/QuantumParticles';
@@ -9,6 +8,7 @@ import { SystemLogs } from '@/components/SystemLogs';
 import { QuantumCircuit } from '@/components/QuantumCircuit';
 import { SensorDashboard } from '@/components/SensorDashboard';
 import { ChatInterface } from '@/components/ChatInterface';
+import { ChatSidebar } from '@/components/ChatSidebar';
 import { SystemMetrics } from '@/components/SystemMetrics';
 import { QuantumAlgorithms } from '@/components/QuantumAlgorithms';
 import { QuantumCryptography } from '@/components/QuantumCryptography';
@@ -89,14 +89,19 @@ const Index = () => {
           </div>
 
           {/* Main Dashboard */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+            {/* Chat Sidebar */}
+            <div className="lg:col-span-1">
+              <ChatSidebar />
+            </div>
+
             {/* Chat Interface */}
             <div className="lg:col-span-2">
               <ChatInterface />
             </div>
 
             {/* System Status */}
-            <div className="space-y-6">
+            <div className="lg:col-span-1 space-y-6">
               <SystemMetrics metrics={quantumMetrics} />
               <QuantumStatus metrics={quantumMetrics} />
               <ConnectivityStatus />

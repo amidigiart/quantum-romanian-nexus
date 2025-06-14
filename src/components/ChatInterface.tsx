@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Bot, Send, Info, Atom, Microchip, User, Brain, Shield, Calculator } from 'lucide-react';
+import { useChat, ChatMessage } from '@/hooks/useChat';
+import { useAuth } from '@/hooks/useAuth';
 
 interface ChatMessage {
   id: string;
@@ -13,14 +15,14 @@ interface ChatMessage {
 }
 
 export const ChatInterface = () => {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: '1',
-      text: 'Bună ziua! Sunt asistentul dvs. cuantic avansat. Pot să vă ajut cu 10 funcții cuantice hibride: algoritmi Grover/Shor, criptografie cuantică, învățare automată cuantică, optimizare QAOA, simulare VQE, și multe altele. Cu ce vă pot ajuta?',
-      isBot: true,
-      timestamp: new Date()
-    }
-  ]);
+  const { user } = useAuth();
+  const { 
+    messages, 
+    setMessages, 
+    saveMessage, 
+    currentConversation,
+    loading 
+  } = useChat();
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -31,6 +33,19 @@ export const ChatInterface = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Initialize with welcome message if no current conversation
+  useEffect(() => {
+    if (!currentConversation && messages.length === 0 && user) {
+      const welcomeMessage: ChatMessage = {
+        id: '1',
+        text: 'Bună ziua! Sunt asistentul dvs. cuantic avansat. Pot să vă ajut cu 10 funcții cuantice hibride: algoritmi Grover/Shor, criptografie cuantică, învățare automată cuantică, optimizare QAOA, simulare VQE, și multe altele. Cu ce vă pot ajuta?',
+        isBot: true,
+        timestamp: new Date()
+      };
+      setMessages([welcomeMessage]);
+    }
+  }, [currentConversation, user, messages.length, setMessages]);
 
   const generateBotResponse = (message: string): string => {
     const lowerMessage = message.toLowerCase();
@@ -60,8 +75,8 @@ export const ChatInterface = () => {
     return 'Înțeleg întrebarea dvs. despre computarea cuantică avansată. Sistemul nostru implementează 10 funcții cuantice hibride principale: algoritmi de căutare și factorizare, criptografie cuantică, învățare automată cuantică, optimizare, simulare, corecția erorilor, și multe altele. Cu ce anume vă pot ajuta?';
   };
 
-  const sendMessage = () => {
-    if (!inputValue.trim()) return;
+  const sendMessage = async () => {
+    if (!inputValue.trim() || !user) return;
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -70,18 +85,23 @@ export const ChatInterface = () => {
       timestamp: new Date()
     };
 
+    // Add user message to UI and save to database
     setMessages(prev => [...prev, userMessage]);
+    await saveMessage(userMessage, currentConversation?.id);
     setInputValue('');
 
     // Simulate bot response delay
-    setTimeout(() => {
+    setTimeout(async () => {
       const botMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         text: generateBotResponse(inputValue),
         isBot: true,
         timestamp: new Date()
       };
+      
+      // Add bot message to UI and save to database
       setMessages(prev => [...prev, botMessage]);
+      await saveMessage(botMessage, currentConversation?.id);
     }, 1000);
   };
 
@@ -104,6 +124,19 @@ export const ChatInterface = () => {
       sendMessage();
     }
   };
+
+  if (loading) {
+    return (
+      <Card className="bg-white/10 backdrop-blur-lg border-white/20 p-6 quantum-glow">
+        <div className="flex items-center justify-center h-64">
+          <div className="flex flex-col items-center gap-4">
+            <Atom className="w-8 h-8 text-cyan-400 animate-spin" />
+            <p className="text-white">Se încarcă conversația...</p>
+          </div>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card className="bg-white/10 backdrop-blur-lg border-white/20 p-6 quantum-glow">
@@ -151,9 +184,11 @@ export const ChatInterface = () => {
           onKeyPress={handleKeyPress}
           placeholder="Întrebați despre computarea cuantică, senzori IoT..."
           className="bg-white/20 border-white/30 text-white placeholder-gray-300 focus:ring-cyan-400"
+          disabled={!user}
         />
         <Button 
           onClick={sendMessage}
+          disabled={!user || !inputValue.trim()}
           className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600"
         >
           <Send className="w-4 h-4" />
@@ -168,6 +203,7 @@ export const ChatInterface = () => {
             variant="outline"
             size="sm"
             onClick={() => handleQuickAction(action.action)}
+            disabled={!user}
             className="border-white/30 text-white hover:bg-white/20 transition-all hover:scale-105 text-xs"
           >
             {index === 0 && <Calculator className="w-3 h-3 mr-1" />}
