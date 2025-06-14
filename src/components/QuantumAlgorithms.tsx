@@ -2,67 +2,68 @@
 import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Brain } from 'lucide-react';
-import { AlgorithmGrid } from './quantum-algorithms/AlgorithmGrid';
-import { SearchInterface } from './quantum-algorithms/SearchInterface';
-import { ResultsDisplay } from './quantum-algorithms/ResultsDisplay';
-import { algorithms } from './quantum-algorithms/algorithmData';
-import { generateAlgorithmResult } from './quantum-algorithms/utils';
-import { AlgorithmResult } from './quantum-algorithms/types';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Atom, Zap, GitBranch } from 'lucide-react';
+import { AlgorithmGrid } from '@/components/quantum-algorithms/AlgorithmGrid';
+import { SearchInterface } from '@/components/quantum-algorithms/SearchInterface';
+import { ResultsDisplay } from '@/components/quantum-algorithms/ResultsDisplay';
+import { VQEOptimizer } from '@/components/VQEOptimizer';
+import { useQuantumAlgorithms } from '@/hooks/useQuantumAlgorithms';
 
 export const QuantumAlgorithms = () => {
-  const [activeAlgorithm, setActiveAlgorithm] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [results, setResults] = useState<AlgorithmResult[]>([]);
-
-  const executeAlgorithm = (algorithmId: string) => {
-    setActiveAlgorithm(algorithmId);
-    const algorithm = algorithms.find(a => a.id === algorithmId);
-    
-    if (!algorithm) return;
-
-    // Simulate algorithm execution
-    const newResult: AlgorithmResult = {
-      name: algorithm.name,
-      result: 'Executare în progres...',
-      complexity: algorithm.complexity,
-      status: 'running'
-    };
-    
-    setResults(prev => [newResult, ...prev.slice(0, 4)]);
-
-    setTimeout(() => {
-      const completedResult = generateAlgorithmResult(algorithmId);
-      setResults(prev => prev.map((r, i) => 
-        i === 0 ? { ...r, ...completedResult, status: 'completed' } : r
-      ));
-      setActiveAlgorithm(null);
-    }, 2000 + Math.random() * 3000);
-  };
+  const {
+    algorithms,
+    selectedAlgorithm,
+    setSelectedAlgorithm,
+    results,
+    isRunning,
+    runAlgorithm,
+    searchQuery,
+    setSearchQuery,
+    filteredAlgorithms
+  } = useQuantumAlgorithms();
 
   return (
     <Card className="bg-white/10 backdrop-blur-lg border-white/20 p-6">
       <div className="flex items-center gap-2 mb-6">
-        <Brain className="w-6 h-6 text-cyan-400" />
-        <h3 className="text-2xl font-bold text-white">Algoritmi Cuantici Hibrizi</h3>
-        <Badge variant="outline" className="border-cyan-400 text-cyan-400 ml-auto">
-          10 Funcții
+        <Atom className="w-6 h-6 text-blue-400" />
+        <h3 className="text-2xl font-bold text-white">Algoritmi Cuantici Avansați</h3>
+        <Badge variant="outline" className="border-blue-400 text-blue-400 ml-auto">
+          <GitBranch className="w-3 h-3 mr-1" />
+          Optimizați
         </Badge>
       </div>
 
-      <AlgorithmGrid
-        algorithms={algorithms}
-        activeAlgorithm={activeAlgorithm}
-        onExecuteAlgorithm={executeAlgorithm}
-      />
+      <Tabs defaultValue="algorithms" className="w-full">
+        <TabsList className="grid w-full grid-cols-3 bg-white/10 backdrop-blur-lg border-white/20">
+          <TabsTrigger value="algorithms">Algoritmi</TabsTrigger>
+          <TabsTrigger value="vqe">VQE Optimizer</TabsTrigger>
+          <TabsTrigger value="results">Rezultate</TabsTrigger>
+        </TabsList>
 
-      <SearchInterface
-        searchQuery={searchQuery}
-        onSearchQueryChange={setSearchQuery}
-        onExecuteSearch={() => executeAlgorithm('grover')}
-      />
+        <TabsContent value="algorithms" className="mt-6">
+          <SearchInterface 
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+          />
+          
+          <AlgorithmGrid
+            algorithms={filteredAlgorithms}
+            selectedAlgorithm={selectedAlgorithm}
+            setSelectedAlgorithm={setSelectedAlgorithm}
+            onRunAlgorithm={runAlgorithm}
+            isRunning={isRunning}
+          />
+        </TabsContent>
 
-      <ResultsDisplay results={results} />
+        <TabsContent value="vqe" className="mt-6">
+          <VQEOptimizer />
+        </TabsContent>
+
+        <TabsContent value="results" className="mt-6">
+          <ResultsDisplay results={results} />
+        </TabsContent>
+      </Tabs>
     </Card>
   );
 };
