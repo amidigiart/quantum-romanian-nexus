@@ -24,6 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { QuantumChemistryLab } from '@/components/QuantumChemistryLab';
 import { FinancialQuantumOptimizer } from '@/components/FinancialQuantumOptimizer';
 import { QuantumWeatherPrediction } from '@/components/QuantumWeatherPrediction';
+import { QuantumSupremacyBenchmarks } from '@/components/QuantumSupremacyBenchmarks';
 
 const Index = () => {
   const [sensorData, setSensorData] = useState({
@@ -134,9 +135,19 @@ const Index = () => {
                   </div>
                 </div>
 
+                {/* Quantum Supremacy Benchmarks */}
+                <div className="mb-8">
+                  <QuantumSupremacyBenchmarks />
+                </div>
+
                 {/* Financial Quantum Optimizer */}
                 <div className="mb-8">
                   <FinancialQuantumOptimizer />
+                </div>
+
+                {/* Quantum Weather Prediction */}
+                <div className="mb-8">
+                  <QuantumWeatherPrediction />
                 </div>
 
                 {/* Quantum Internet Simulator */}
