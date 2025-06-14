@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
-import { cloud, thermometer, wind, Activity, Target, Zap } from 'lucide-react';
+import { Cloud, Thermometer, Wind, Activity, Target, Zap } from 'lucide-react';
 
 interface WeatherData {
   location: string;
@@ -160,15 +159,15 @@ export const QuantumWeatherPrediction = () => {
   }, []);
 
   const getWeatherIcon = (precipitation: number) => {
-    if (precipitation > 60) return <cloud className="w-6 h-6 text-gray-400" />;
-    if (precipitation > 30) return <cloud className="w-6 h-6 text-blue-400" />;
-    return <cloud className="w-6 h-6 text-yellow-400" />;
+    if (precipitation > 60) return <Cloud className="w-6 h-6 text-gray-400" />;
+    if (precipitation > 30) return <Cloud className="w-6 h-6 text-blue-400" />;
+    return <Cloud className="w-6 h-6 text-yellow-400" />;
   };
 
   return (
     <Card className="bg-white/10 backdrop-blur-lg border-white/20 p-6">
       <div className="flex items-center gap-2 mb-6">
-        <cloud className="w-6 h-6 text-blue-400" />
+        <Cloud className="w-6 h-6 text-blue-400" />
         <h3 className="text-2xl font-bold text-white">Quantum Weather Prediction</h3>
         <Badge variant="outline" className="border-blue-400 text-blue-400 ml-auto">
           <Activity className="w-3 h-3 mr-1" />
@@ -252,12 +251,12 @@ export const QuantumWeatherPrediction = () => {
         <TabsContent value="current" className="mt-6">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div className="bg-black/30 rounded-lg p-4 text-center">
-              <thermometer className="w-8 h-8 text-red-400 mx-auto mb-2" />
+              <Thermometer className="w-8 h-8 text-red-400 mx-auto mb-2" />
               <div className="text-2xl font-bold text-white">{currentWeather.temperature}°C</div>
               <div className="text-gray-400 text-sm">Temperatură</div>
             </div>
             <div className="bg-black/30 rounded-lg p-4 text-center">
-              <cloud className="w-8 h-8 text-blue-400 mx-auto mb-2" />
+              <Cloud className="w-8 h-8 text-blue-400 mx-auto mb-2" />
               <div className="text-2xl font-bold text-white">{currentWeather.humidity}%</div>
               <div className="text-gray-400 text-sm">Umiditate</div>
             </div>
@@ -267,7 +266,7 @@ export const QuantumWeatherPrediction = () => {
               <div className="text-gray-400 text-sm">Presiune (hPa)</div>
             </div>
             <div className="bg-black/30 rounded-lg p-4 text-center">
-              <wind className="w-8 h-8 text-green-400 mx-auto mb-2" />
+              <Wind className="w-8 h-8 text-green-400 mx-auto mb-2" />
               <div className="text-2xl font-bold text-white">{currentWeather.windSpeed}</div>
               <div className="text-gray-400 text-sm">Vânt (km/h)</div>
             </div>
@@ -277,7 +276,7 @@ export const QuantumWeatherPrediction = () => {
               <div className="text-gray-400 text-sm">Vizibilitate (km)</div>
             </div>
             <div className="bg-black/30 rounded-lg p-4 text-center">
-              <cloud className="w-8 h-8 text-purple-400 mx-auto mb-2" />
+              <Cloud className="w-8 h-8 text-purple-400 mx-auto mb-2" />
               <div className="text-2xl font-bold text-white">{currentWeather.precipitation}%</div>
               <div className="text-gray-400 text-sm">Precipitații</div>
             </div>
