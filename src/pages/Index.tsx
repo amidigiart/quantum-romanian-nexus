@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Header } from '@/components/Header';
 import { QuantumParticles } from '@/components/QuantumParticles';
@@ -24,6 +23,7 @@ import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { QuantumChemistryLab } from '@/components/QuantumChemistryLab';
 import { FinancialQuantumOptimizer } from '@/components/FinancialQuantumOptimizer';
+import { QuantumWeatherPrediction } from '@/components/QuantumWeatherPrediction';
 
 const Index = () => {
   const [sensorData, setSensorData] = useState({
