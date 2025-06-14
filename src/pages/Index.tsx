@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Header } from '@/components/Header';
 import { QuantumParticles } from '@/components/QuantumParticles';
@@ -22,6 +21,7 @@ import { AdminPanel } from '@/components/AdminPanel';
 import { TeamManager } from '@/components/TeamManager';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { QuantumChemistryLab } from '@/components/QuantumChemistryLab';
 
 const Index = () => {
   const [sensorData, setSensorData] = useState({
@@ -135,6 +135,11 @@ const Index = () => {
                 {/* Quantum Internet Simulator */}
                 <div className="mb-8">
                   <QuantumInternetSimulator />
+                </div>
+
+                {/* Quantum Chemistry Lab */}
+                <div className="mb-8">
+                  <QuantumChemistryLab />
                 </div>
 
                 {/* Quantum News Feed */}
