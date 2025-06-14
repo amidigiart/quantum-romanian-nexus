@@ -2,10 +2,12 @@
 import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Brain } from 'lucide-react';
 import { AlgorithmGrid } from './quantum-algorithms/AlgorithmGrid';
 import { SearchInterface } from './quantum-algorithms/SearchInterface';
 import { ResultsDisplay } from './quantum-algorithms/ResultsDisplay';
+import { MultiHopQuantumCommunication } from './MultiHopQuantumCommunication';
 import { algorithms } from './quantum-algorithms/algorithmData';
 import { generateAlgorithmResult } from './quantum-algorithms/utils';
 import { AlgorithmResult } from './quantum-algorithms/types';
@@ -50,19 +52,32 @@ export const QuantumAlgorithms = () => {
         </Badge>
       </div>
 
-      <AlgorithmGrid
-        algorithms={algorithms}
-        activeAlgorithm={activeAlgorithm}
-        onExecuteAlgorithm={executeAlgorithm}
-      />
+      <Tabs defaultValue="algorithms" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 bg-white/10 backdrop-blur-lg border-white/20">
+          <TabsTrigger value="algorithms">Algoritmi</TabsTrigger>
+          <TabsTrigger value="multi-hop">Multi-Hop</TabsTrigger>
+        </TabsList>
 
-      <SearchInterface
-        searchQuery={searchQuery}
-        onSearchQueryChange={setSearchQuery}
-        onExecuteSearch={() => executeAlgorithm('grover')}
-      />
+        <TabsContent value="algorithms" className="mt-6">
+          <AlgorithmGrid
+            algorithms={algorithms}
+            activeAlgorithm={activeAlgorithm}
+            onExecuteAlgorithm={executeAlgorithm}
+          />
 
-      <ResultsDisplay results={results} />
+          <SearchInterface
+            searchQuery={searchQuery}
+            onSearchQueryChange={setSearchQuery}
+            onExecuteSearch={() => executeAlgorithm('grover')}
+          />
+
+          <ResultsDisplay results={results} />
+        </TabsContent>
+
+        <TabsContent value="multi-hop" className="mt-6">
+          <MultiHopQuantumCommunication />
+        </TabsContent>
+      </Tabs>
     </Card>
   );
 };
