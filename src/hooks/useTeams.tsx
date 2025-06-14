@@ -17,7 +17,7 @@ export interface TeamMembership {
   id: string;
   team_id: string;
   user_id: string;
-  role: 'owner' | 'admin' | 'member';
+  role: string; // Changed from union type to string to match database
   joined_at: string;
 }
 
@@ -117,7 +117,7 @@ export const useTeams = () => {
     }
   };
 
-  const addTeamMember = async (teamId: string, userId: string, role: 'admin' | 'member' = 'member') => {
+  const addTeamMember = async (teamId: string, userId: string, role: string = 'member') => {
     if (!user) return;
 
     try {
