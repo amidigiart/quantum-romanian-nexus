@@ -8,6 +8,7 @@ import { AlgorithmGrid } from './quantum-algorithms/AlgorithmGrid';
 import { SearchInterface } from './quantum-algorithms/SearchInterface';
 import { ResultsDisplay } from './quantum-algorithms/ResultsDisplay';
 import { MultiHopQuantumCommunication } from './MultiHopQuantumCommunication';
+import { QuantumNetworkRouting } from './QuantumNetworkRouting';
 import { algorithms } from './quantum-algorithms/algorithmData';
 import { generateAlgorithmResult } from './quantum-algorithms/utils';
 import { AlgorithmResult } from './quantum-algorithms/types';
@@ -53,9 +54,10 @@ export const QuantumAlgorithms = () => {
       </div>
 
       <Tabs defaultValue="algorithms" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 bg-white/10 backdrop-blur-lg border-white/20">
+        <TabsList className="grid w-full grid-cols-3 bg-white/10 backdrop-blur-lg border-white/20">
           <TabsTrigger value="algorithms">Algoritmi</TabsTrigger>
           <TabsTrigger value="multi-hop">Multi-Hop</TabsTrigger>
+          <TabsTrigger value="routing">Rutare</TabsTrigger>
         </TabsList>
 
         <TabsContent value="algorithms" className="mt-6">
@@ -76,6 +78,10 @@ export const QuantumAlgorithms = () => {
 
         <TabsContent value="multi-hop" className="mt-6">
           <MultiHopQuantumCommunication />
+        </TabsContent>
+
+        <TabsContent value="routing" className="mt-6">
+          <QuantumNetworkRouting />
         </TabsContent>
       </Tabs>
     </Card>
