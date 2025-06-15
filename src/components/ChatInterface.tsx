@@ -1,5 +1,4 @@
-
-import React from 'react';
+import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { VirtualizedMessageList } from '@/components/chat/VirtualizedMessageList';
 import { MessageInput } from '@/components/chat/MessageInput';
@@ -10,6 +9,8 @@ import { ChatHeader } from '@/components/chat/ChatHeader';
 import { EnhancedModeToggle } from '@/components/chat/EnhancedModeToggle';
 import { LoadingState } from '@/components/chat/LoadingState';
 import { useChatHandlers } from '@/components/chat/useChatHandlers';
+import { AIProviderSelector, AI_PROVIDERS } from '@/components/chat/AIProviderSelector';
+import { useMultiProviderBotResponses } from '@/hooks/chat/useMultiProviderBotResponses';
 
 export const ChatInterface = () => {
   const {
@@ -32,6 +33,10 @@ export const ChatInterface = () => {
     componentRef
   } = useChatHandlers();
 
+  const [selectedProvider, setSelectedProvider] = useState('openai');
+  const [selectedModel, setSelectedModel] = useState('gpt-4.1-2025-04-14');
+  const { generateResponseWithProvider, isGenerating } = useMultiProviderBotResponses();
+
   if (loading) {
     return <LoadingState />;
   }
@@ -45,6 +50,14 @@ export const ChatInterface = () => {
         useEnhancedMode={useEnhancedMode}
         cacheHitRate={cacheStats.hitRate}
         lastUpdated={lastUpdated}
+      />
+
+      <AIProviderSelector
+        selectedProvider={selectedProvider}
+        selectedModel={selectedModel}
+        onProviderChange={setSelectedProvider}
+        onModelChange={setSelectedModel}
+        disabled={!user || isGenerating}
       />
 
       <EnhancedModeToggle 

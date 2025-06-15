@@ -1,16 +1,16 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Bot, Atom, Zap, Brain, Sparkles } from 'lucide-react';
 import { useChat, ChatMessage } from '@/hooks/useChat';
 import { useAuth } from '@/hooks/useAuth';
-import { useEnhancedBotResponses } from '@/hooks/chat/useEnhancedBotResponses';
 import { useChatMessages } from '@/hooks/chat/useChatMessages';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { VirtualizedMessageList } from '@/components/chat/VirtualizedMessageList';
 import { MessageInput } from '@/components/chat/MessageInput';
 import { QuickActions } from '@/components/chat/QuickActions';
+import { AIProviderSelector, AI_PROVIDERS } from '@/components/chat/AIProviderSelector';
+import { useMultiProviderBotResponses } from '@/hooks/chat/useMultiProviderBotResponses';
 
 export const EnhancedChatInterface = () => {
   const { user } = useAuth();
@@ -19,14 +19,13 @@ export const EnhancedChatInterface = () => {
     currentConversation,
     loading 
   } = useChat();
+  
   const { 
-    generateEnhancedBotResponse,
-    generateStreamingResponse,
-    conversationContext,
-    isStreaming,
-    newsContext,
-    lastUpdated
-  } = useEnhancedBotResponses();
+    generateResponseWithProvider,
+    isGenerating,
+    newsContext
+  } = useMultiProviderBotResponses();
+  
   const { 
     messages, 
     addMessage, 
@@ -35,9 +34,12 @@ export const EnhancedChatInterface = () => {
     updateMessageOnError,
     pendingMessages 
   } = useChatMessages();
+  
   const [inputValue, setInputValue] = useState('');
   const [streamingMessage, setStreamingMessage] = useState<string>('');
   const [isEnhancedMode, setIsEnhancedMode] = useState(true);
+  const [selectedProvider, setSelectedProvider] = useState('openai');
+  const [selectedModel, setSelectedModel] = useState('gpt-4.1-2025-04-14');
 
   const { trackEvent } = useAnalytics({
     component: 'EnhancedChatInterface',
@@ -61,12 +63,6 @@ export const EnhancedChatInterface = () => {
   const sendEnhancedMessage = async () => {
     if (!inputValue.trim() || !user) return;
 
-    trackEvent('enhanced_message_sent', {
-      message_length: inputValue.length,
-      enhanced_mode: isEnhancedMode,
-      context_topics: conversationContext.topics.length
-    });
-
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       text: inputValue,
@@ -86,40 +82,14 @@ export const EnhancedChatInterface = () => {
       (error) => updateMessageOnError(userMessage.id, 'Failed to send message')
     );
 
-    // Generate enhanced bot response
+    // Generate AI response with selected provider
     setTimeout(async () => {
       try {
-        let botResponseText: string;
-        
-        if (isEnhancedMode && messageToProcess.length < 100) {
-          // Use streaming for shorter messages
-          const botMessage: ChatMessage = {
-            id: (Date.now() + 1).toString(),
-            text: '',
-            isBot: true,
-            timestamp: new Date()
-          };
-          
-          addMessage(botMessage, true);
-          
-          botResponseText = await generateStreamingResponse(
-            messageToProcess,
-            (chunk) => {
-              setStreamingMessage(chunk);
-              // Update the message in real-time
-              botMessage.text = chunk;
-            },
-            currentConversation?.id
-          );
-          
-          setStreamingMessage('');
-        } else {
-          // Use enhanced response for longer or complex messages
-          botResponseText = await generateEnhancedBotResponse(
-            messageToProcess,
-            currentConversation?.id
-          );
-        }
+        const botResponseText = await generateResponseWithProvider(
+          messageToProcess,
+          { provider: selectedProvider, model: selectedModel },
+          currentConversation?.id
+        );
         
         const finalBotMessage: ChatMessage = {
           id: (Date.now() + 1).toString(),
@@ -128,26 +98,14 @@ export const EnhancedChatInterface = () => {
           timestamp: new Date()
         };
         
-        if (!isEnhancedMode || messageToProcess.length >= 100) {
-          addMessage(finalBotMessage, true);
-        } else {
-          // Update the streaming message to final state
-          finalBotMessage.text = botResponseText;
-        }
-        
+        addMessage(finalBotMessage, true);
         markMessageAsSaved(finalBotMessage.id);
-        
-        trackEvent('enhanced_response_received', {
-          response_length: botResponseText.length,
-          enhanced_features_used: isEnhancedMode,
-          context_applied: conversationContext.topics.length > 0
-        });
       } catch (error) {
         console.error('Enhanced response error:', error);
         
         const errorMessage: ChatMessage = {
           id: (Date.now() + 1).toString(),
-          text: '🔧 Sistemul AI avansat întâmpină dificultăți tehnice. Încerc să revin la funcționarea normală...',
+          text: `🔧 Sistemul AI ${selectedProvider} întâmpină dificultăți tehnice. Vă rugăm să încercați cu alt provider sau să verificați configurația.`,
           isBot: true,
           timestamp: new Date()
         };
@@ -188,7 +146,7 @@ export const EnhancedChatInterface = () => {
           <Sparkles className="w-3 h-3 mr-1" />
           Contextual
         </Badge>
-        {conversationContext.topics.length > 0 && (
+        {/* {conversationContext.topics.length > 0 && (
           <Badge variant="outline" className="border-cyan-400 text-cyan-400">
             Context: {conversationContext.topics.slice(-2).join(', ')}
           </Badge>
@@ -198,8 +156,16 @@ export const EnhancedChatInterface = () => {
             <Zap className="w-3 h-3 mr-1" />
             Streaming
           </Badge>
-        )}
+        )} */}
       </div>
+
+      <AIProviderSelector
+        selectedProvider={selectedProvider}
+        selectedModel={selectedModel}
+        onProviderChange={setSelectedProvider}
+        onModelChange={setSelectedModel}
+        disabled={!user || isGenerating}
+      />
 
       <div className="flex items-center gap-2 mb-4">
         <label className="flex items-center gap-2 text-sm text-gray-300">
@@ -211,10 +177,10 @@ export const EnhancedChatInterface = () => {
           />
           Mod AI Avansat
         </label>
-        <span className="text-xs text-gray-400">
+        {/* <span className="text-xs text-gray-400">
           Context: {conversationContext.recentMessages.length} mesaje | 
           Topicuri: {conversationContext.topics.length}
-        </span>
+        </span> */}
       </div>
       
       <VirtualizedMessageList 
@@ -227,7 +193,7 @@ export const EnhancedChatInterface = () => {
         value={inputValue}
         onChange={setInputValue}
         onSend={sendEnhancedMessage}
-        disabled={!user || isStreaming}
+        disabled={!user || isGenerating}
         placeholder={isEnhancedMode ? 
           "Întrebați cu context avansat despre quantum computing..." : 
           "Întrebați despre quantum computing..."
@@ -236,7 +202,7 @@ export const EnhancedChatInterface = () => {
 
       <QuickActions 
         onActionClick={handleQuickAction}
-        disabled={!user || isStreaming}
+        disabled={!user || isGenerating}
         enhanced={isEnhancedMode}
       />
     </Card>
