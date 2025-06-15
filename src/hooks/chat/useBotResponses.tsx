@@ -1,6 +1,6 @@
-
 import { useQuantumNews } from '@/hooks/useQuantumNews';
 import { responseCacheService } from '@/services/responseCacheService';
+import { advancedCacheService } from '@/services/advancedCacheService';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -9,8 +9,13 @@ export const useBotResponses = () => {
   const { user } = useAuth();
 
   const generateBotResponse = async (message: string, conversationId?: string): Promise<string> => {
-    // Check local cache first for immediate response
-    const cachedResponse = responseCacheService.getCachedResponse(message);
+    // Check advanced cache first (multi-level caching)
+    const cacheKey = `bot-response:${message}`;
+    const cachedResponse = await advancedCacheService.get<string>(
+      cacheKey, 
+      ['chat-response', 'bot-generated']
+    );
+    
     if (cachedResponse) {
       return cachedResponse;
     }
@@ -19,6 +24,14 @@ export const useBotResponses = () => {
       // First check if the query relates to recent news (local processing for real-time data)
       const newsResponse = getNewsResponse(message);
       if (newsResponse) {
+        // Cache news responses with shorter TTL since they're time-sensitive
+        await advancedCacheService.set(
+          cacheKey, 
+          newsResponse, 
+          2 * 60 * 1000, // 2 minutes TTL
+          ['chat-response', 'news', 'time-sensitive'],
+          'high'
+        );
         return newsResponse;
       }
 
@@ -39,10 +52,21 @@ export const useBotResponses = () => {
 
       const response = data.response;
       
-      // Cache the response locally if it's not news-based
-      if (!newsResponse) {
-        responseCacheService.setCachedResponse(message, response);
-      }
+      // Cache the response in advanced cache with appropriate tags and priority
+      const isAlgorithmQuery = message.toLowerCase().includes('algoritm') || 
+                             message.toLowerCase().includes('quantum');
+      const priority = isAlgorithmQuery ? 'high' : 'medium';
+      const tags = ['chat-response', 'bot-generated'];
+      
+      if (isAlgorithmQuery) tags.push('algorithms');
+      
+      await advancedCacheService.set(
+        cacheKey,
+        response,
+        10 * 60 * 1000, // 10 minutes TTL
+        tags,
+        priority
+      );
 
       return response;
     } catch (error) {
@@ -52,6 +76,17 @@ export const useBotResponses = () => {
   };
 
   const generateCachedBotResponse = async (message: string): Promise<string> => {
+    // Use advanced cache for FAQ responses with longer TTL
+    const cacheKey = `faq-response:${message}`;
+    const cachedResponse = await advancedCacheService.get<string>(
+      cacheKey,
+      ['chat-response', 'faq', 'static']
+    );
+
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+
     try {
       // Use cached edge function for frequently asked questions
       const { data, error } = await supabase.functions.invoke('cached-bot-response', {
@@ -66,7 +101,18 @@ export const useBotResponses = () => {
         return generateLocalFallback(message);
       }
 
-      return data.response;
+      const response = data.response;
+      
+      // Cache FAQ responses with longer TTL since they're static
+      await advancedCacheService.set(
+        cacheKey,
+        response,
+        30 * 60 * 1000, // 30 minutes TTL
+        ['chat-response', 'faq', 'static'],
+        'high' // High priority for FAQ
+      );
+
+      return response;
     } catch (error) {
       console.error('Error calling cached bot response edge function:', error);
       return generateLocalFallback(message);
@@ -86,10 +132,35 @@ export const useBotResponses = () => {
 
   const clearResponseCache = () => {
     responseCacheService.clearCache();
+    // Also clear relevant entries from advanced cache
+    advancedCacheService.invalidateByTags(['chat-response']);
   };
 
   const getCacheStats = () => {
     return responseCacheService.getCacheStats();
+  };
+
+  const getAdvancedCacheMetrics = () => {
+    return advancedCacheService.getMetrics();
+  };
+
+  const warmFrequentlyAskedQuestions = async () => {
+    const commonQuestions = [
+      'Ce este quantum computing?',
+      'Cum funcționează un computer cuantic?',
+      'Care sunt avantajele quantum computing?',
+      'Ce algoritmi cuantici implementați?'
+    ];
+
+    const warmingStrategies = commonQuestions.map(question => ({
+      key: `faq-response:${question}`,
+      dataLoader: () => generateCachedBotResponse(question),
+      ttl: 30 * 60 * 1000, // 30 minutes
+      tags: ['chat-response', 'faq', 'static'],
+      priority: 'high' as const
+    }));
+
+    await advancedCacheService.warmCache(warmingStrategies);
   };
 
   return {
@@ -98,6 +169,8 @@ export const useBotResponses = () => {
     newsContext,
     lastUpdated,
     clearResponseCache,
-    getCacheStats
+    getCacheStats,
+    getAdvancedCacheMetrics,
+    warmFrequentlyAskedQuestions
   };
 };
