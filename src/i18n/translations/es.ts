@@ -37,9 +37,7 @@ export default {
   'ai_provider.select_model': 'Seleccionar Modelo',
   'ai_provider.openai': 'OpenAI',
   'ai_provider.anthropic': 'Anthropic',
-  'ai_provider.perplex
-
-': 'Perplexity',
+  'ai_provider.perplexity': 'Perplexity',
   
   // Language Selector
   'language.select': 'Seleccionar idioma',
