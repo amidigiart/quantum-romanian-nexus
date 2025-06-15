@@ -13,16 +13,17 @@ import { useChatMessages } from '@/hooks/chat/useChatMessages';
 import { useLazyMultiProviderBotResponses } from '@/hooks/chat/useLazyMultiProviderBotResponses';
 import { useOptimizedRealtimeChat } from '@/hooks/chat/useOptimizedRealtimeChat';
 import { useMemoryManagement } from '@/hooks/chat/useMemoryManagement';
+import { useBatchMessageManager } from '@/hooks/chat/useBatchMessageManager';
 import { ChatMessage } from '@/hooks/useChat';
 import { LazyPersonalizationSettings } from '../personalization/LazyPersonalizationSettings';
 import { performanceMonitoringService } from '@/services/performanceMonitoringService';
-import { cachePerformanceMonitor } from '@/services/cachePerformanceMonitor';
 
 export const OptimizedChatInterface = React.memo(() => {
   const { user } = useAuth();
   const { messages, addMessage, pendingMessages } = useChatMessages();
   const { generateResponseWithProvider, isGenerating } = useLazyMultiProviderBotResponses();
   const { checkMemoryPressure } = useMemoryManagement();
+  const { saveBatchedMessage, queueSize } = useBatchMessageManager();
   
   const [inputValue, setInputValue] = useState('');
   const [selectedProvider, setSelectedProvider] = useState('openai');
@@ -46,7 +47,6 @@ export const OptimizedChatInterface = React.memo(() => {
   const sendMessage = async () => {
     if (!inputValue.trim() || !user || isGenerating) return;
 
-    // Measure message sending performance
     return performanceMonitoringService.measureOperation('send_message', async () => {
       const userMessage: ChatMessage = {
         id: Date.now().toString(),
@@ -58,6 +58,17 @@ export const OptimizedChatInterface = React.memo(() => {
       addMessage(userMessage, true);
       const messageText = inputValue;
       setInputValue('');
+
+      // Use batched saving for user message
+      saveBatchedMessage(
+        userMessage,
+        'current-conversation-id', // Replace with actual conversation ID
+        {
+          priority: 'normal',
+          onSuccess: () => console.log('User message saved'),
+          onError: (error) => console.error('Failed to save user message:', error)
+        }
+      );
 
       try {
         const botResponse = await generateResponseWithProvider(
@@ -73,10 +84,21 @@ export const OptimizedChatInterface = React.memo(() => {
         };
         
         addMessage(botMessage, true);
+        
+        // Use batched saving for bot message with high priority
+        saveBatchedMessage(
+          botMessage,
+          'current-conversation-id', // Replace with actual conversation ID
+          {
+            priority: 'high', // Bot responses are more important
+            onSuccess: () => console.log('Bot message saved'),
+            onError: (error) => console.error('Failed to save bot message:', error)
+          }
+        );
+        
         checkMemoryPressure();
       } catch (error) {
         console.error('Error sending message:', error);
-        // Performance monitoring will automatically track the error
       }
     });
   };
@@ -132,12 +154,20 @@ export const OptimizedChatInterface = React.memo(() => {
               </Button>
             </div>
             
-            {isConnected && (
-              <div className="flex items-center gap-2 text-green-400 text-sm">
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                Real-time Connected
-              </div>
-            )}
+            <div className="flex items-center gap-4">
+              {queueSize > 0 && (
+                <div className="text-orange-400 text-sm">
+                  {queueSize} messages queued
+                </div>
+              )}
+              
+              {isConnected && (
+                <div className="flex items-center gap-2 text-green-400 text-sm">
+                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                  Real-time Connected
+                </div>
+              )}
+            </div>
           </div>
           
           <ChatErrorBoundary fallback={

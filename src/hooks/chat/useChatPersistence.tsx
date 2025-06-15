@@ -1,14 +1,15 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { ChatMessage, ChatConversation } from '@/hooks/useChat';
+import { ChatMessage } from '@/hooks/useChat';
+import { useOptimizedChatPersistence } from './useOptimizedChatPersistence';
 
 export const useChatPersistence = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const { queueMessage } = useOptimizedChatPersistence();
 
   const saveMessage = async (
     message: ChatMessage, 
@@ -21,35 +22,31 @@ export const useChatPersistence = () => {
       return;
     }
 
-    try {
-      // Optimized insert with specific columns to reduce payload
-      const { error } = await supabase
-        .from('chat_messages')
-        .insert({
-          conversation_id: conversationId,
-          user_id: user.id,
-          content: message.text,
-          message_type: message.isBot ? 'assistant' : 'user',
-          quantum_data: message.quantum_data || null
-        })
-        .select('id'); // Only select what we need
+    if (!conversationId) {
+      // Fallback to immediate save for messages without conversation
+      try {
+        const { error } = await supabase
+          .from('chat_messages')
+          .insert({
+            conversation_id: conversationId,
+            user_id: user.id,
+            content: message.text,
+            message_type: message.isBot ? 'assistant' : 'user',
+            quantum_data: message.quantum_data || null
+          })
+          .select('id');
 
-      if (error) throw error;
-
-      // Batch update conversation timestamp to reduce database calls
-      if (conversationId) {
-        await supabase
-          .from('chat_conversations')
-          .update({ updated_at: new Date().toISOString() })
-          .eq('id', conversationId)
-          .eq('user_id', user.id); // Use compound condition for index optimization
+        if (error) throw error;
+        onSuccess?.();
+      } catch (error) {
+        console.error('Error saving message:', error);
+        onError?.(error);
       }
-
-      onSuccess?.();
-    } catch (error) {
-      console.error('Error saving message:', error);
-      onError?.(error);
+      return;
     }
+
+    // Use batched saving for messages with conversation
+    queueMessage(message, conversationId, onSuccess, onError);
   };
 
   const loadMessages = async (conversationId: string, limit: number = 100): Promise<ChatMessage[]> => {
@@ -57,14 +54,13 @@ export const useChatPersistence = () => {
 
     setLoading(true);
     try {
-      // Optimized query using the new indexes
       const { data, error } = await supabase
         .from('chat_messages')
-        .select('id, content, message_type, quantum_data, created_at') // Only select needed columns
+        .select('id, content, message_type, quantum_data, created_at')
         .eq('conversation_id', conversationId)
-        .eq('user_id', user.id) // Add user_id filter for security and index usage
+        .eq('user_id', user.id)
         .order('created_at', { ascending: true })
-        .limit(limit); // Add pagination support
+        .limit(limit);
 
       if (error) throw error;
 
@@ -92,7 +88,6 @@ export const useChatPersistence = () => {
     if (!user) return [];
 
     try {
-      // Optimized query for recent messages using descending order then reversing
       const { data, error } = await supabase
         .from('chat_messages')
         .select('id, content, message_type, quantum_data, created_at')
@@ -103,7 +98,6 @@ export const useChatPersistence = () => {
 
       if (error) throw error;
 
-      // Reverse to get chronological order
       return data.reverse().map(msg => ({
         id: msg.id,
         text: msg.content,
