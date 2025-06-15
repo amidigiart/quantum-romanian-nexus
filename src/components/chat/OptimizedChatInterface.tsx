@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,6 +7,7 @@ import { MessageInput } from './MessageInput';
 import { QuickActions } from './QuickActions';
 import { WelcomeMessage } from './WelcomeMessage';
 import { MemoryManagementControls } from './MemoryManagementControls';
+import { ChatErrorBoundary } from './ChatErrorBoundary';
 import { useAuth } from '@/hooks/useAuth';
 import { useChatMessages } from '@/hooks/chat/useChatMessages';
 import { useLazyMultiProviderBotResponses } from '@/hooks/chat/useLazyMultiProviderBotResponses';
@@ -15,6 +15,8 @@ import { useOptimizedRealtimeChat } from '@/hooks/chat/useOptimizedRealtimeChat'
 import { useMemoryManagement } from '@/hooks/chat/useMemoryManagement';
 import { ChatMessage } from '@/hooks/useChat';
 import { LazyPersonalizationSettings } from '../personalization/LazyPersonalizationSettings';
+import { performanceMonitoringService } from '@/services/performanceMonitoringService';
+import { cachePerformanceMonitor } from '@/services/cachePerformanceMonitor';
 
 export const OptimizedChatInterface = React.memo(() => {
   const { user } = useAuth();
@@ -42,39 +44,41 @@ export const OptimizedChatInterface = React.memo(() => {
   }, [setMessageHandlers, addMessage, checkMemoryPressure]);
 
   const sendMessage = async () => {
-    if (!inputValue.trim() || !user) return;
+    if (!inputValue.trim() || !user || isGenerating) return;
 
-    const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      text: inputValue,
-      isBot: false,
-      timestamp: new Date()
-    };
-
-    addMessage(userMessage, true);
-    const messageText = inputValue;
-    setInputValue('');
-
-    try {
-      const botResponse = await generateResponseWithProvider(
-        messageText,
-        { provider: selectedProvider, model: selectedModel }
-      );
-      
-      const botMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        text: botResponse,
-        isBot: true,
+    // Measure message sending performance
+    return performanceMonitoringService.measureOperation('send_message', async () => {
+      const userMessage: ChatMessage = {
+        id: Date.now().toString(),
+        text: inputValue,
+        isBot: false,
         timestamp: new Date()
       };
-      
-      addMessage(botMessage, true);
-      
-      // Trigger memory pressure check after adding messages
-      checkMemoryPressure();
-    } catch (error) {
-      console.error('Error sending message:', error);
-    }
+
+      addMessage(userMessage, true);
+      const messageText = inputValue;
+      setInputValue('');
+
+      try {
+        const botResponse = await generateResponseWithProvider(
+          messageText,
+          { provider: selectedProvider, model: selectedModel }
+        );
+        
+        const botMessage: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          text: botResponse,
+          isBot: true,
+          timestamp: new Date()
+        };
+        
+        addMessage(botMessage, true);
+        checkMemoryPressure();
+      } catch (error) {
+        console.error('Error sending message:', error);
+        // Performance monitoring will automatically track the error
+      }
+    });
   };
 
   const handleQuickAction = (action: string) => {
@@ -88,77 +92,100 @@ export const OptimizedChatInterface = React.memo(() => {
 
   return (
     <div className="space-y-4">
-      <Card className="bg-white/10 backdrop-blur-lg border-white/20 p-6 quantum-glow">
-        <WelcomeMessage isEnhanced={true} />
+      <ChatErrorBoundary>
+        <Card className="bg-white/10 backdrop-blur-lg border-white/20 p-6 quantum-glow">
+          <WelcomeMessage isEnhanced={true} />
 
-        <LazyAIProviderSelector
-          selectedProvider={selectedProvider}
-          selectedModel={selectedModel}
-          onProviderChange={setSelectedProvider}
-          onModelChange={setSelectedModel}
-          disabled={!user || isGenerating}
-        />
+          <ChatErrorBoundary fallback={
+            <div className="p-4 bg-yellow-950/20 border-yellow-500/30 rounded text-yellow-400">
+              AI Provider selector temporarily unavailable
+            </div>
+          }>
+            <LazyAIProviderSelector
+              selectedProvider={selectedProvider}
+              selectedModel={selectedModel}
+              onProviderChange={setSelectedProvider}
+              onModelChange={setSelectedModel}
+              disabled={!user || isGenerating}
+            />
+          </ChatErrorBoundary>
 
-        <div className="flex justify-between mb-4">
-          <div className="flex gap-2">
-            <Button
-              onClick={loadPersonalizationSettings}
-              variant="outline"
-              size="sm"
-              className="border-cyan-400 text-cyan-400 hover:bg-cyan-400 hover:text-white"
-            >
-              🧠 Personalization
-            </Button>
+          {/* Controls section */}
+          <div className="flex justify-between mb-4">
+            <div className="flex gap-2">
+              <Button
+                onClick={loadPersonalizationSettings}
+                variant="outline"
+                size="sm"
+                className="border-cyan-400 text-cyan-400 hover:bg-cyan-400 hover:text-white"
+              >
+                🧠 Personalization
+              </Button>
+              
+              <Button
+                onClick={() => setShowMemoryControls(!showMemoryControls)}
+                variant="outline"
+                size="sm"
+                className="border-purple-400 text-purple-400 hover:bg-purple-400 hover:text-white"
+              >
+                📊 Memory
+              </Button>
+            </div>
             
-            <Button
-              onClick={() => setShowMemoryControls(!showMemoryControls)}
-              variant="outline"
-              size="sm"
-              className="border-purple-400 text-purple-400 hover:bg-purple-400 hover:text-white"
-            >
-              📊 Memory
-            </Button>
+            {isConnected && (
+              <div className="flex items-center gap-2 text-green-400 text-sm">
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                Real-time Connected
+              </div>
+            )}
           </div>
           
-          {isConnected && (
-            <div className="flex items-center gap-2 text-green-400 text-sm">
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-              Real-time Connected
+          <ChatErrorBoundary fallback={
+            <div className="p-4 bg-red-950/20 border-red-500/30 rounded text-red-400">
+              Message list temporarily unavailable. Please refresh the page.
             </div>
-          )}
-        </div>
-        
-        <VirtualizedMessageList 
-          messages={messages} 
-          pendingMessages={pendingMessages}
-          maxMessagesInView={100}
-        />
+          }>
+            <VirtualizedMessageList 
+              messages={messages} 
+              pendingMessages={pendingMessages}
+              maxMessagesInView={100}
+            />
+          </ChatErrorBoundary>
 
-        <MessageInput
-          value={inputValue}
-          onChange={setInputValue}
-          onSend={sendMessage}
-          disabled={!user || isGenerating}
-          placeholder="Ask about quantum computing..."
-        />
+          <ChatErrorBoundary>
+            <MessageInput
+              value={inputValue}
+              onChange={setInputValue}
+              onSend={sendMessage}
+              disabled={!user || isGenerating}
+              placeholder="Ask about quantum computing..."
+            />
+          </ChatErrorBoundary>
 
-        <QuickActions 
-          onActionClick={handleQuickAction}
-          disabled={!user || isGenerating}
-        />
-      </Card>
+          <ChatErrorBoundary>
+            <QuickActions 
+              onActionClick={handleQuickAction}
+              disabled={!user || isGenerating}
+            />
+          </ChatErrorBoundary>
+        </Card>
+      </ChatErrorBoundary>
 
       {/* Memory Management Controls */}
       {showMemoryControls && (
         <React.Suspense fallback={<div>Loading memory controls...</div>}>
-          <MemoryManagementControls />
+          <ChatErrorBoundary>
+            <MemoryManagementControls />
+          </ChatErrorBoundary>
         </React.Suspense>
       )}
 
       {/* Personalization Settings */}
       {showPersonalization && (
         <React.Suspense fallback={<div>Loading personalization...</div>}>
-          <LazyPersonalizationSettings />
+          <ChatErrorBoundary>
+            <LazyPersonalizationSettings />
+          </ChatErrorBoundary>
         </React.Suspense>
       )}
     </div>
