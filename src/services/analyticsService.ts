@@ -1,60 +1,23 @@
 
-interface AnalyticsEvent {
-  event_type: string;
-  user_id?: string;
-  session_id: string;
-  timestamp: number;
-  data: any;
-  route?: string;
-}
-
-interface UserBehaviorMetrics {
-  pageViews: number;
-  sessionDuration: number;
-  clickEvents: number;
-  interactions: { [key: string]: number };
-  conversationCount: number;
-  messageCount: number;
-}
-
-interface PerformanceMetrics {
-  loadTime: number;
-  responseTime: number;
-  errorRate: number;
-  cacheHitRate: number;
-  memoryUsage: number;
-}
-
-interface SystemMetrics {
-  activeUsers: number;
-  totalSessions: number;
-  errorCount: number;
-  cachePerformance: {
-    hits: number;
-    misses: number;
-    efficiency: number;
-  };
-}
+import { AnalyticsEvent, UserBehaviorMetrics, PerformanceMetrics } from '@/types/analytics';
+import { PerformanceMonitor } from './analytics/performanceMonitor';
+import { BehaviorTracker } from './analytics/behaviorTracker';
+import { EventStorage } from './analytics/eventStorage';
+import { MetricsCalculator } from './analytics/metricsCalculator';
 
 export class AnalyticsService {
-  private events: AnalyticsEvent[] = [];
   private sessionId: string;
-  private sessionStartTime: number;
-  private performanceObserver?: PerformanceObserver;
-  private userBehavior: UserBehaviorMetrics;
+  private performanceMonitor: PerformanceMonitor;
+  private behaviorTracker: BehaviorTracker;
+  private eventStorage: EventStorage;
 
   constructor() {
     this.sessionId = this.generateSessionId();
-    this.sessionStartTime = Date.now();
-    this.userBehavior = {
-      pageViews: 0,
-      sessionDuration: 0,
-      clickEvents: 0,
-      interactions: {},
-      conversationCount: 0,
-      messageCount: 0
-    };
-    this.initializePerformanceMonitoring();
+    this.eventStorage = new EventStorage();
+    this.behaviorTracker = new BehaviorTracker();
+    this.performanceMonitor = new PerformanceMonitor(this.handlePerformanceEvent.bind(this));
+    
+    this.eventStorage.loadPersistedEvents();
     this.trackPageView();
   }
 
@@ -62,35 +25,10 @@ export class AnalyticsService {
     return Date.now().toString(36) + Math.random().toString(36).substr(2);
   }
 
-  private initializePerformanceMonitoring(): void {
-    // Monitor performance metrics
-    if ('PerformanceObserver' in window) {
-      this.performanceObserver = new PerformanceObserver((list) => {
-        list.getEntries().forEach((entry) => {
-          this.trackEvent('performance', {
-            name: entry.name,
-            duration: entry.duration,
-            type: entry.entryType
-          });
-        });
-      });
-      
-      this.performanceObserver.observe({ 
-        entryTypes: ['navigation', 'resource', 'measure'] 
-      });
-    }
-
-    // Track memory usage
-    if ('memory' in performance) {
-      setInterval(() => {
-        const memory = (performance as any).memory;
-        this.trackEvent('memory_usage', {
-          used: memory.usedJSHeapSize,
-          total: memory.totalJSHeapSize,
-          limit: memory.jsHeapSizeLimit
-        });
-      }, 60000); // Every minute
-    }
+  private handlePerformanceEvent(event: AnalyticsEvent): void {
+    event.session_id = this.sessionId;
+    event.route = window.location.pathname;
+    this.eventStorage.addEvent(event);
   }
 
   trackEvent(eventType: string, data: any = {}, userId?: string): void {
@@ -103,36 +41,10 @@ export class AnalyticsService {
       route: window.location.pathname
     };
 
-    this.events.push(event);
-    this.updateUserBehavior(eventType, data);
-    
-    // Store in sessionStorage for persistence
-    this.persistEvents();
+    this.eventStorage.addEvent(event);
+    this.behaviorTracker.updateBehavior(eventType, data);
     
     console.log('Analytics Event:', event);
-  }
-
-  private updateUserBehavior(eventType: string, data: any): void {
-    switch (eventType) {
-      case 'page_view':
-        this.userBehavior.pageViews++;
-        break;
-      case 'click':
-        this.userBehavior.clickEvents++;
-        if (data.component) {
-          this.userBehavior.interactions[data.component] = 
-            (this.userBehavior.interactions[data.component] || 0) + 1;
-        }
-        break;
-      case 'conversation_created':
-        this.userBehavior.conversationCount++;
-        break;
-      case 'message_sent':
-        this.userBehavior.messageCount++;
-        break;
-    }
-    
-    this.userBehavior.sessionDuration = Date.now() - this.sessionStartTime;
   }
 
   trackPageView(route?: string): void {
@@ -168,113 +80,42 @@ export class AnalyticsService {
   trackCacheOperation(operation: 'hit' | 'miss' | 'set' | 'clear', key?: string): void {
     this.trackEvent('cache_operation', {
       operation,
-      key: key ? key.substring(0, 50) : undefined // Truncate long keys
+      key: key ? key.substring(0, 50) : undefined
     });
   }
 
   getSessionMetrics(): UserBehaviorMetrics {
-    return {
-      ...this.userBehavior,
-      sessionDuration: Date.now() - this.sessionStartTime
-    };
+    return this.behaviorTracker.getMetrics();
   }
 
   getPerformanceMetrics(): PerformanceMetrics {
-    const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
-    const loadTime = navigation ? navigation.loadEventEnd - navigation.fetchStart : 0;
-    
-    const errorEvents = this.events.filter(e => e.event_type === 'error');
-    const cacheEvents = this.events.filter(e => e.event_type === 'cache_operation');
-    const cacheHits = cacheEvents.filter(e => e.data.operation === 'hit').length;
-    const cacheMisses = cacheEvents.filter(e => e.data.operation === 'miss').length;
-    const cacheHitRate = (cacheHits + cacheMisses) > 0 ? (cacheHits / (cacheHits + cacheMisses)) * 100 : 0;
-
-    return {
-      loadTime,
-      responseTime: this.getAverageResponseTime(),
-      errorRate: (errorEvents.length / this.events.length) * 100,
-      cacheHitRate,
-      memoryUsage: this.getCurrentMemoryUsage()
-    };
-  }
-
-  private getAverageResponseTime(): number {
-    const performanceEvents = this.events.filter(e => e.event_type === 'performance');
-    if (performanceEvents.length === 0) return 0;
-    
-    const totalDuration = performanceEvents.reduce((sum, event) => sum + event.data.duration, 0);
-    return totalDuration / performanceEvents.length;
-  }
-
-  private getCurrentMemoryUsage(): number {
-    if ('memory' in performance) {
-      const memory = (performance as any).memory;
-      return (memory.usedJSHeapSize / memory.jsHeapSizeLimit) * 100;
-    }
-    return 0;
+    return MetricsCalculator.calculatePerformanceMetrics(this.eventStorage.getEvents());
   }
 
   getRecentEvents(limit: number = 100): AnalyticsEvent[] {
-    return this.events.slice(-limit);
+    return this.eventStorage.getRecentEvents(limit);
   }
 
   getEventsByType(eventType: string, limit: number = 50): AnalyticsEvent[] {
-    return this.events
-      .filter(e => e.event_type === eventType)
-      .slice(-limit);
+    return this.eventStorage.getEventsByType(eventType, limit);
   }
 
   exportAnalytics(): string {
     const analytics = {
       session_id: this.sessionId,
-      session_start: new Date(this.sessionStartTime).toISOString(),
-      session_duration: Date.now() - this.sessionStartTime,
-      user_behavior: this.userBehavior,
+      session_start: new Date(Date.now() - this.behaviorTracker.getMetrics().sessionDuration).toISOString(),
+      session_duration: this.behaviorTracker.getMetrics().sessionDuration,
+      user_behavior: this.behaviorTracker.getMetrics(),
       performance_metrics: this.getPerformanceMetrics(),
-      events: this.events
+      events: this.eventStorage.getEvents()
     };
 
     return JSON.stringify(analytics, null, 2);
   }
 
-  private persistEvents(): void {
-    try {
-      const recentEvents = this.events.slice(-500); // Keep last 500 events
-      sessionStorage.setItem('analytics_events', JSON.stringify(recentEvents));
-      sessionStorage.setItem('user_behavior', JSON.stringify(this.userBehavior));
-    } catch (error) {
-      console.error('Failed to persist analytics events:', error);
-    }
-  }
-
-  private loadPersistedEvents(): void {
-    try {
-      const storedEvents = sessionStorage.getItem('analytics_events');
-      const storedBehavior = sessionStorage.getItem('user_behavior');
-      
-      if (storedEvents) {
-        this.events = JSON.parse(storedEvents);
-      }
-      
-      if (storedBehavior) {
-        this.userBehavior = { ...this.userBehavior, ...JSON.parse(storedBehavior) };
-      }
-    } catch (error) {
-      console.error('Failed to load persisted analytics:', error);
-    }
-  }
-
   clearAnalytics(): void {
-    this.events = [];
-    this.userBehavior = {
-      pageViews: 0,
-      sessionDuration: 0,
-      clickEvents: 0,
-      interactions: {},
-      conversationCount: 0,
-      messageCount: 0
-    };
-    sessionStorage.removeItem('analytics_events');
+    this.eventStorage.clearEvents();
+    this.behaviorTracker.reset();
     sessionStorage.removeItem('user_behavior');
   }
 }
