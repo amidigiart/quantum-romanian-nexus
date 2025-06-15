@@ -23,4 +23,4 @@ export const loadPresenceIndicator = () => import('./PresenceIndicator');
 export * from './providers';
 
 // Types (no runtime cost) - import from the lazy hook instead
-export type { AIProviderConfig } from '../hooks/chat/useLazyMultiProviderBotResponses';
+export type { AIProviderConfig } from '../../hooks/chat/useLazyMultiProviderBotResponses';

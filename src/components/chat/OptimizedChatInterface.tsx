@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,6 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useChatMessages } from '@/hooks/chat/useChatMessages';
 import { useLazyMultiProviderBotResponses } from '@/hooks/chat/useLazyMultiProviderBotResponses';
 import { ChatMessage } from '@/hooks/useChat';
+import { LazyPersonalizationSettings } from '../personalization/LazyPersonalizationSettings';
 
 export const OptimizedChatInterface = React.memo(() => {
   const { user } = useAuth();
@@ -61,7 +61,6 @@ export const OptimizedChatInterface = React.memo(() => {
   };
 
   const loadPersonalizationSettings = async () => {
-    const { LazyPersonalizationSettings } = await import('../personalization/LazyPersonalizationSettings');
     setShowPersonalization(true);
   };
 
@@ -110,7 +109,7 @@ export const OptimizedChatInterface = React.memo(() => {
 
       {showPersonalization && (
         <React.Suspense fallback={<div>Loading personalization...</div>}>
-          {React.lazy(() => import('../personalization/LazyPersonalizationSettings').then(m => ({ default: m.LazyPersonalizationSettings })))()}
+          <LazyPersonalizationSettings />
         </React.Suspense>
       )}
     </div>
