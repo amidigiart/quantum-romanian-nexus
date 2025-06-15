@@ -9,12 +9,14 @@ interface RealtimeConfig {
   autoReconnect: boolean;
   maxReconnectAttempts: number;
   heartbeatInterval: number;
+  typingThrottleDelay: number;
 }
 
 const DEFAULT_REALTIME_CONFIG: RealtimeConfig = {
   autoReconnect: true,
   maxReconnectAttempts: 3,
-  heartbeatInterval: 30000
+  heartbeatInterval: 30000,
+  typingThrottleDelay: 1000 // Throttle typing indicators to max once per second
 };
 
 export const useOptimizedRealtimeChat = (
@@ -28,6 +30,8 @@ export const useOptimizedRealtimeChat = (
   const realtimeConfig = { ...DEFAULT_REALTIME_CONFIG, ...config };
   
   const subscriberIdRef = useRef<string>();
+  const lastTypingIndicatorRef = useRef<number>(0);
+  const typingIndicatorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const messageHandlersRef = useRef<{
     onMessage?: (message: ChatMessage) => void;
     onConversationUpdate?: (conversation: ChatConversation) => void;
@@ -135,8 +139,35 @@ export const useOptimizedRealtimeChat = (
     setConnectionError(null);
   }, [currentConversation]);
 
-  // Send typing indicator (throttled)
+  // Throttled typing indicator function
   const sendTypingIndicator = useCallback((isTyping: boolean) => {
+    if (!isConnected || !currentConversation) return;
+
+    const now = Date.now();
+    
+    // Clear any pending timeout
+    if (typingIndicatorTimeoutRef.current) {
+      clearTimeout(typingIndicatorTimeoutRef.current);
+      typingIndicatorTimeoutRef.current = null;
+    }
+
+    if (isTyping) {
+      // Throttle typing start indicators
+      if (now - lastTypingIndicatorRef.current < realtimeConfig.typingThrottleDelay) {
+        // If we're within the throttle window, schedule for later
+        typingIndicatorTimeoutRef.current = setTimeout(() => {
+          sendTypingIndicatorImmediate(true);
+        }, realtimeConfig.typingThrottleDelay - (now - lastTypingIndicatorRef.current));
+        return;
+      }
+    }
+
+    // Send immediately for stop typing or if throttle period has passed
+    sendTypingIndicatorImmediate(isTyping);
+  }, [isConnected, currentConversation, user?.id, realtimeConfig.typingThrottleDelay]);
+
+  // Internal function to send typing indicator without throttling
+  const sendTypingIndicatorImmediate = useCallback((isTyping: boolean) => {
     if (!isConnected || !currentConversation) return;
 
     const wsUrl = `wss://your-realtime-server.com/conversations/${currentConversation.id}`;
@@ -145,8 +176,15 @@ export const useOptimizedRealtimeChat = (
     if (socket && socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify({
         type: 'typing',
-        payload: { isTyping, userId: user?.id }
+        payload: { isTyping, userId: user?.id, timestamp: Date.now() }
       }));
+      
+      if (isTyping) {
+        lastTypingIndicatorRef.current = Date.now();
+        console.log('Sent typing indicator (throttled)');
+      } else {
+        console.log('Sent stop typing indicator');
+      }
     }
   }, [isConnected, currentConversation, user?.id]);
 
@@ -161,14 +199,15 @@ export const useOptimizedRealtimeChat = (
     };
   }, [currentConversation, connectToRealtime, disconnectFromRealtime]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       disconnectFromRealtime();
+      if (typingIndicatorTimeoutRef.current) {
+        clearTimeout(typingIndicatorTimeoutRef.current);
+      }
     };
   }, [disconnectFromRealtime]);
 
-  // Get connection statistics
   const getConnectionStats = useCallback(() => {
     return websocketPool.getPoolStats();
   }, []);
