@@ -29,7 +29,7 @@ export const OptimizedChatInterface = React.memo(() => {
   // Set up optimized realtime chat
   const { isConnected, setMessageHandlers } = useOptimizedRealtimeChat(null);
 
-  // Use the optimized chat handlers with streaming
+  // Use the optimized chat handlers with streaming - initialize without isStreaming dependency
   const { 
     inputValue, 
     setInputValue, 
@@ -39,7 +39,7 @@ export const OptimizedChatInterface = React.memo(() => {
     isStreaming
   } = useOptimizedChatHandlers({
     user,
-    isGenerating: isGenerating || isStreaming,
+    isGenerating,
     addMessage,
     generateResponseWithProvider,
     saveBatchedMessage,
