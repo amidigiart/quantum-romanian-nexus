@@ -4,6 +4,7 @@ import { ChatMessage } from '@/hooks/useChat';
 import { performanceMonitoringService } from '@/services/performanceMonitoringService';
 import { useStreamingResponse } from './useStreamingResponse';
 import { StreamingBotService } from '@/services/streamingBotService';
+import { requestDeduplicationService } from '@/services/requestDeduplicationService';
 
 interface UseOptimizedChatHandlersProps {
   user: any;
@@ -53,6 +54,12 @@ export const useOptimizedChatHandlers = ({
   const sendMessage = useCallback(async () => {
     if (!inputValue.trim() || !user || isGenerating || isStreaming) return;
 
+    // Check if request is already pending
+    if (StreamingBotService.isRequestPending(inputValue, user.id, 'current-conversation-id')) {
+      console.log('Request already pending, ignoring duplicate');
+      return;
+    }
+
     return performanceMonitoringService.measureOperation('send_message_streaming', async () => {
       const userMessage: ChatMessage = {
         id: Date.now().toString(),
@@ -77,7 +84,7 @@ export const useOptimizedChatHandlers = ({
       );
 
       try {
-        // Start streaming response
+        // Start streaming response with deduplication
         const streamingMessageId = (Date.now() + 1).toString();
         startStreaming(streamingMessageId);
 
@@ -122,9 +129,25 @@ export const useOptimizedChatHandlers = ({
   }, [inputValue, user, isGenerating, isStreaming, addMessage, saveBatchedMessage, checkMemoryPressure, startStreaming, appendToStream, completeStreaming, cancelStreaming]);
 
   const handleQuickAction = useCallback((action: string) => {
+    // Cancel any pending request for the previous input
+    if (inputValue.trim() && user) {
+      StreamingBotService.cancelRequest(inputValue, user.id, 'current-conversation-id');
+    }
+    
     setInputValue(action);
     setTimeout(() => sendMessage(), 100);
-  }, [sendMessage]);
+  }, [inputValue, user, sendMessage]);
+
+  const cancelCurrentRequest = useCallback(() => {
+    if (inputValue.trim() && user) {
+      StreamingBotService.cancelRequest(inputValue, user.id, 'current-conversation-id');
+      cancelStreaming();
+    }
+  }, [inputValue, user, cancelStreaming]);
+
+  const getPendingRequestsCount = useCallback(() => {
+    return requestDeduplicationService.getPendingRequestsCount();
+  }, []);
 
   return {
     inputValue,
@@ -132,6 +155,8 @@ export const useOptimizedChatHandlers = ({
     sendMessage,
     handleQuickAction,
     streamingMessage,
-    isStreaming
+    isStreaming,
+    cancelCurrentRequest,
+    getPendingRequestsCount
   };
 };
