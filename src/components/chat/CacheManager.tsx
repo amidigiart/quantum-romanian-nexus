@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -8,6 +9,7 @@ import { CacheAnalytics } from './CacheAnalytics';
 import { CacheStats } from './CacheStats';
 import { CacheControls } from './CacheControls';
 import { CacheOverview } from './CacheOverview';
+import { cacheHitOptimizer } from '@/services/cache/cacheHitOptimizer';
 
 export const CacheManager = () => {
   const { 

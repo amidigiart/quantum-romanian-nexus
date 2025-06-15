@@ -9,6 +9,10 @@ export interface ResponseQuality {
   contextualFit: number;
 }
 
+export const assessResponseQuality = (message: string, response: string, context: ConversationContext): ResponseQuality => {
+  return assessAdvancedResponseQuality(message, response, context);
+};
+
 export const assessAdvancedResponseQuality = (message: string, response: string, context: ConversationContext): ResponseQuality => {
   const relevance = calculateAdvancedRelevance(message, response, context);
   const completeness = calculateAdvancedCompleteness(response, context);

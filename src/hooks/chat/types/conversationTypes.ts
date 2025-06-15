@@ -15,3 +15,8 @@ export interface EnhancedResponseMetrics {
   contextRelevance: number;
   userSatisfactionPrediction: number;
 }
+
+export interface NewsContext {
+  news: Array<{ id: string; title: string; summary: string; created_at: string }>;
+  lastUpdated: Date | null;
+}
