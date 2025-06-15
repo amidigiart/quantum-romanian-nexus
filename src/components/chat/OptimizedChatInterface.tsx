@@ -29,10 +29,17 @@ export const OptimizedChatInterface = React.memo(() => {
   // Set up optimized realtime chat
   const { isConnected, setMessageHandlers } = useOptimizedRealtimeChat(null);
 
-  // Use the optimized chat handlers
-  const { inputValue, setInputValue, sendMessage, handleQuickAction } = useOptimizedChatHandlers({
+  // Use the optimized chat handlers with streaming
+  const { 
+    inputValue, 
+    setInputValue, 
+    sendMessage, 
+    handleQuickAction,
+    streamingMessage,
+    isStreaming
+  } = useOptimizedChatHandlers({
     user,
-    isGenerating,
+    isGenerating: isGenerating || isStreaming,
     addMessage,
     generateResponseWithProvider,
     saveBatchedMessage,
@@ -76,8 +83,21 @@ export const OptimizedChatInterface = React.memo(() => {
             queueSize={queueSize}
             isConnected={isConnected}
             user={user}
-            isGenerating={isGenerating}
+            isGenerating={isGenerating || isStreaming}
           />
+          
+          {/* Display streaming message */}
+          {isStreaming && streamingMessage && (
+            <div className="mt-4 p-3 bg-blue-600/20 border-blue-400/30 rounded-lg border">
+              <div className="flex items-start gap-2">
+                <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse mt-2"></div>
+                <div className="text-blue-200 text-sm leading-relaxed">
+                  {streamingMessage}
+                  <span className="inline-block w-2 h-4 bg-cyan-400 ml-1 animate-pulse"></span>
+                </div>
+              </div>
+            </div>
+          )}
         </Card>
       </ChatErrorBoundary>
 

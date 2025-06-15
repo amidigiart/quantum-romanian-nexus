@@ -2,6 +2,8 @@
 import { useState, useCallback } from 'react';
 import { ChatMessage } from '@/hooks/useChat';
 import { performanceMonitoringService } from '@/services/performanceMonitoringService';
+import { useStreamingResponse } from './useStreamingResponse';
+import { StreamingBotService } from '@/services/streamingBotService';
 
 interface UseOptimizedChatHandlersProps {
   user: any;
@@ -26,10 +28,32 @@ export const useOptimizedChatHandlers = ({
 }: UseOptimizedChatHandlersProps) => {
   const [inputValue, setInputValue] = useState('');
 
-  const sendMessage = useCallback(async () => {
-    if (!inputValue.trim() || !user || isGenerating) return;
+  const {
+    streamingMessage,
+    isStreaming,
+    startStreaming,
+    appendToStream,
+    completeStreaming,
+    cancelStreaming
+  } = useStreamingResponse({
+    onMessageComplete: (message) => {
+      addMessage(message, true);
+      saveBatchedMessage(
+        message,
+        'current-conversation-id',
+        {
+          priority: 'high',
+          onSuccess: () => console.log('Streamed bot message saved'),
+          onError: (error: any) => console.error('Failed to save streamed bot message:', error)
+        }
+      );
+    }
+  });
 
-    return performanceMonitoringService.measureOperation('send_message', async () => {
+  const sendMessage = useCallback(async () => {
+    if (!inputValue.trim() || !user || isGenerating || isStreaming) return;
+
+    return performanceMonitoringService.measureOperation('send_message_streaming', async () => {
       const userMessage: ChatMessage = {
         id: Date.now().toString(),
         text: inputValue,
@@ -41,10 +65,10 @@ export const useOptimizedChatHandlers = ({
       const messageText = inputValue;
       setInputValue('');
 
-      // Use batched saving for user message
+      // Save user message
       saveBatchedMessage(
         userMessage,
-        'current-conversation-id', // Replace with actual conversation ID
+        'current-conversation-id',
         {
           priority: 'normal',
           onSuccess: () => console.log('User message saved'),
@@ -53,37 +77,49 @@ export const useOptimizedChatHandlers = ({
       );
 
       try {
-        const botResponse = await generateResponseWithProvider(
-          messageText,
-          { provider: selectedProvider, model: selectedModel }
-        );
-        
-        const botMessage: ChatMessage = {
-          id: (Date.now() + 1).toString(),
-          text: botResponse,
-          isBot: true,
-          timestamp: new Date()
-        };
-        
-        addMessage(botMessage, true);
-        
-        // Use batched saving for bot message with high priority
-        saveBatchedMessage(
-          botMessage,
-          'current-conversation-id', // Replace with actual conversation ID
+        // Start streaming response
+        const streamingMessageId = (Date.now() + 1).toString();
+        startStreaming(streamingMessageId);
+
+        await StreamingBotService.generateStreamingResponse(
           {
-            priority: 'high', // Bot responses are more important
-            onSuccess: () => console.log('Bot message saved'),
-            onError: (error: any) => console.error('Failed to save bot message:', error)
+            message: messageText,
+            conversationId: 'current-conversation-id',
+            userId: user?.id,
+            context: {
+              recentMessages: [],
+              topics: [],
+              userPreferences: []
+            }
+          },
+          (chunk: string) => {
+            appendToStream(chunk);
+          },
+          () => {
+            completeStreaming();
+            checkMemoryPressure();
+          },
+          (error: Error) => {
+            console.error('Streaming error:', error);
+            cancelStreaming();
+            
+            // Fallback to regular response
+            const errorMessage: ChatMessage = {
+              id: streamingMessageId,
+              text: 'Ne pare rău, am întâmpinat o problemă tehnică. Vă rugăm să încercați din nou.',
+              isBot: true,
+              timestamp: new Date()
+            };
+            addMessage(errorMessage, false);
           }
         );
         
-        checkMemoryPressure();
       } catch (error) {
         console.error('Error sending message:', error);
+        cancelStreaming();
       }
     });
-  }, [inputValue, user, isGenerating, addMessage, generateResponseWithProvider, saveBatchedMessage, checkMemoryPressure, selectedProvider, selectedModel]);
+  }, [inputValue, user, isGenerating, isStreaming, addMessage, saveBatchedMessage, checkMemoryPressure, startStreaming, appendToStream, completeStreaming, cancelStreaming]);
 
   const handleQuickAction = useCallback((action: string) => {
     setInputValue(action);
@@ -94,6 +130,8 @@ export const useOptimizedChatHandlers = ({
     inputValue,
     setInputValue,
     sendMessage,
-    handleQuickAction
+    handleQuickAction,
+    streamingMessage,
+    isStreaming
   };
 };

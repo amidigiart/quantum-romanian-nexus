@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Bot, User, Clock } from 'lucide-react';
 import { ChatMessage } from '@/hooks/useChat';
@@ -117,7 +116,10 @@ export const VirtualizedMessageList: React.FC<VirtualizedMessageListProps> = ({
             <div className="flex items-start gap-2">
               <Bot className="w-4 h-4 mt-0.5 flex-shrink-0" />
               <p className="text-sm leading-relaxed whitespace-pre-line">{streamingMessage}</p>
-              <div className="w-2 h-4 bg-cyan-400 animate-pulse rounded" />
+              <div className="w-2 h-4 bg-cyan-400 animate-pulse rounded flex-shrink-0 mt-0.5" />
+            </div>
+            <div className="text-xs opacity-70 mt-1 flex items-center gap-1">
+              <span className="text-cyan-400">• Streaming...</span>
             </div>
           </div>
         </div>
