@@ -18,7 +18,7 @@ interface OptimizedChatContentProps {
   
   // Message props
   messages: ChatMessage[];
-  pendingMessages: ChatMessage[];
+  pendingMessages: Set<string>;
   inputValue: string;
   onInputChange: (value: string) => void;
   onSendMessage: () => void;
