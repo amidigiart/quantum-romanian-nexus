@@ -4,10 +4,9 @@ import { supabase } from '@/integrations/supabase/client';
 export class OptimizedQueryService {
   // Batch operations for better performance
   static async batchInsertMessages(messages: any[]) {
-    const { data, error } = await supabase
-      .from('chat_messages')
-      .insert(messages)
-      .select('id');
+    const { data, error } = await supabase.rpc('batch_insert_messages', {
+      messages: messages
+    });
 
     if (error) throw error;
     return data;
@@ -15,13 +14,12 @@ export class OptimizedQueryService {
 
   // Optimized conversation search with full-text search
   static async searchConversations(userId: string, searchTerm: string, limit: number = 10) {
-    const { data, error } = await supabase
-      .from('chat_conversations')
-      .select('id, title, created_at, updated_at')
-      .eq('user_id', userId)
-      .ilike('title', `%${searchTerm}%`)
-      .order('updated_at', { ascending: false })
-      .limit(limit);
+    const { data, error } = await supabase.rpc('search_conversations_optimized', {
+      p_user_id: userId,
+      p_search_term: searchTerm,
+      p_limit: limit,
+      p_offset: 0
+    });
 
     if (error) throw error;
     return data;
@@ -29,12 +27,12 @@ export class OptimizedQueryService {
 
   // Get conversation statistics efficiently
   static async getConversationStats(userId: string) {
-    const { data: conversationCount, error: convError } = await supabase
+    const { count: conversationCount, error: convError } = await supabase
       .from('chat_conversations')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', userId);
 
-    const { data: messageCount, error: msgError } = await supabase
+    const { count: messageCount, error: msgError } = await supabase
       .from('chat_messages')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', userId);
@@ -49,7 +47,7 @@ export class OptimizedQueryService {
     };
   }
 
-  // Optimized recent activity query
+  // Optimized recent activity query using indexed columns
   static async getRecentActivity(userId: string, limit: number = 5) {
     const { data, error } = await supabase
       .from('chat_conversations')
@@ -71,32 +69,28 @@ export class OptimizedQueryService {
     return data;
   }
 
-  // Clean up old data periodically
+  // Clean up old data using the new database function
   static async cleanupOldData(userId: string, daysToKeep: number = 90) {
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
+    const { data, error } = await supabase.rpc('cleanup_old_conversations', {
+      p_user_id: userId,
+      p_days_old: daysToKeep
+    });
 
-    // Delete old messages first
-    const { error: msgError } = await supabase
+    if (error) throw error;
+    return data;
+  }
+
+  // Get messages with quantum data efficiently
+  static async getMessagesWithQuantumData(conversationId: string, userId: string) {
+    const { data, error } = await supabase
       .from('chat_messages')
-      .delete()
+      .select('id, content, message_type, quantum_data, created_at')
+      .eq('conversation_id', conversationId)
       .eq('user_id', userId)
-      .lt('created_at', cutoffDate.toISOString());
+      .not('quantum_data', 'is', null)
+      .order('created_at', { ascending: true });
 
-    if (msgError) throw msgError;
-
-    // Delete empty conversations
-    const { error: convError } = await supabase
-      .from('chat_conversations')
-      .delete()
-      .eq('user_id', userId)
-      .lt('created_at', cutoffDate.toISOString())
-      .not('id', 'in', `(
-        SELECT DISTINCT conversation_id 
-        FROM chat_messages 
-        WHERE user_id = '${userId}'
-      )`);
-
-    if (convError) throw convError;
+    if (error) throw error;
+    return data;
   }
 }
