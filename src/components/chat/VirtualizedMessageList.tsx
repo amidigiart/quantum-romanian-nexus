@@ -2,24 +2,35 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Bot, User, Clock } from 'lucide-react';
 import { ChatMessage } from '@/hooks/useChat';
+import { useMemoryManagement } from '@/hooks/chat/useMemoryManagement';
 
 interface VirtualizedMessageListProps {
   messages: ChatMessage[];
   pendingMessages?: Set<string>;
   streamingMessage?: string;
+  maxMessagesInView?: number;
 }
 
 const MESSAGE_HEIGHT = 100; // Approximate height per message in pixels
-const BUFFER_SIZE = 5; // Number of extra messages to render outside viewport
 
 export const VirtualizedMessageList: React.FC<VirtualizedMessageListProps> = ({ 
   messages, 
   pendingMessages = new Set(),
-  streamingMessage = ''
+  streamingMessage = '',
+  maxMessagesInView = 100
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
-  const [containerHeight, setContainerHeight] = useState(256); // Default height
+  const [containerHeight, setContainerHeight] = useState(256);
+  const { getVirtualizedRange, updateMessageCount } = useMemoryManagement({
+    maxMessagesInMemory: maxMessagesInView,
+    virtualizationBufferSize: 5
+  });
+
+  // Update memory management with current message count
+  useEffect(() => {
+    updateMessageCount(messages.length);
+  }, [messages.length, updateMessageCount]);
 
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     setScrollTop(e.currentTarget.scrollTop);
@@ -43,18 +54,18 @@ export const VirtualizedMessageList: React.FC<VirtualizedMessageListProps> = ({
     }
   }, [messages.length, streamingMessage]);
 
-  // Calculate which messages should be visible
-  const startIndex = Math.max(0, Math.floor(scrollTop / MESSAGE_HEIGHT) - BUFFER_SIZE);
-  const endIndex = Math.min(
-    messages.length,
-    Math.ceil((scrollTop + containerHeight) / MESSAGE_HEIGHT) + BUFFER_SIZE
+  // Get virtualized range for performance
+  const { startIndex, endIndex, totalHeight, offsetY } = getVirtualizedRange(
+    scrollTop,
+    containerHeight,
+    MESSAGE_HEIGHT,
+    messages.length
   );
 
+  // Only render visible messages to optimize memory
   const visibleMessages = messages.slice(startIndex, endIndex);
-  const totalHeight = messages.length * MESSAGE_HEIGHT;
-  const offsetY = startIndex * MESSAGE_HEIGHT;
 
-  const renderMessage = (message: ChatMessage, index: number) => {
+  const renderMessage = (message: ChatMessage, originalIndex: number) => {
     const isPending = pendingMessages.has(message.id);
     const hasError = (message as any).error;
     
@@ -114,17 +125,34 @@ export const VirtualizedMessageList: React.FC<VirtualizedMessageListProps> = ({
     );
   };
 
+  // Show memory usage indicator for debugging
+  const renderMemoryIndicator = () => {
+    if (process.env.NODE_ENV !== 'development') return null;
+    
+    return (
+      <div className="text-xs text-gray-400 p-2 bg-black/20 rounded mb-2">
+        Rendering {visibleMessages.length} of {messages.length} messages 
+        (Range: {startIndex}-{endIndex})
+      </div>
+    );
+  };
+
   return (
     <div 
       ref={containerRef}
       className="h-64 overflow-y-auto mb-4 p-4 bg-black/20 rounded-lg"
       onScroll={handleScroll}
     >
+      {renderMemoryIndicator()}
+      
       <div style={{ height: totalHeight, position: 'relative' }}>
         <div style={{ transform: `translateY(${offsetY}px)` }}>
-          {visibleMessages.map((message, index) => renderMessage(message, startIndex + index))}
+          {visibleMessages.map((message, index) => 
+            renderMessage(message, startIndex + index)
+          )}
         </div>
       </div>
+      
       {renderStreamingMessage()}
     </div>
   );
