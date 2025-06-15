@@ -11,9 +11,14 @@ interface QuickAction {
 interface QuickActionsProps {
   onActionClick: (action: string) => void;
   disabled?: boolean;
+  enhanced?: boolean;
 }
 
-export const QuickActions: React.FC<QuickActionsProps> = ({ onActionClick, disabled = false }) => {
+export const QuickActions: React.FC<QuickActionsProps> = ({ 
+  onActionClick, 
+  disabled = false, 
+  enhanced = false 
+}) => {
   const quickActions: QuickAction[] = [
     { text: 'Algoritmi Cuantici', action: 'Explică-mi algoritmii Grover și Shor cu ultimele dezvoltări' },
     { text: 'Criptografie Cuantică', action: 'Cum funcționează protocolul BB84 și adoptarea industrială?' },
@@ -36,7 +41,9 @@ export const QuickActions: React.FC<QuickActionsProps> = ({ onActionClick, disab
             size="sm"
             onClick={() => onActionClick(action.action)}
             disabled={disabled}
-            className="border-white/30 text-white hover:bg-white/20 transition-all hover:scale-105 text-xs"
+            className={`border-white/30 text-white hover:bg-white/20 transition-all hover:scale-105 text-xs ${
+              enhanced ? 'border-cyan-400/50 text-cyan-100' : ''
+            }`}
           >
             <IconComponent className="w-3 h-3 mr-1" />
             {action.text}

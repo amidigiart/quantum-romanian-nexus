@@ -6,6 +6,7 @@ import { ChatMessage } from '@/hooks/useChat';
 interface VirtualizedMessageListProps {
   messages: ChatMessage[];
   pendingMessages?: Set<string>;
+  streamingMessage?: string;
 }
 
 const MESSAGE_HEIGHT = 100; // Approximate height per message in pixels
@@ -13,7 +14,8 @@ const BUFFER_SIZE = 5; // Number of extra messages to render outside viewport
 
 export const VirtualizedMessageList: React.FC<VirtualizedMessageListProps> = ({ 
   messages, 
-  pendingMessages = new Set() 
+  pendingMessages = new Set(),
+  streamingMessage = ''
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -39,7 +41,7 @@ export const VirtualizedMessageList: React.FC<VirtualizedMessageListProps> = ({
         container.scrollTop = container.scrollHeight;
       }
     }
-  }, [messages.length]);
+  }, [messages.length, streamingMessage]);
 
   // Calculate which messages should be visible
   const startIndex = Math.max(0, Math.floor(scrollTop / MESSAGE_HEIGHT) - BUFFER_SIZE);
@@ -94,6 +96,24 @@ export const VirtualizedMessageList: React.FC<VirtualizedMessageListProps> = ({
     );
   };
 
+  const renderStreamingMessage = () => {
+    if (!streamingMessage) return null;
+    
+    return (
+      <div className="animate-in slide-in-from-bottom-2 mb-3">
+        <div className="flex justify-start">
+          <div className="max-w-[80%] rounded-lg p-3 bg-blue-600/80 text-white">
+            <div className="flex items-start gap-2">
+              <Bot className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <p className="text-sm leading-relaxed whitespace-pre-line">{streamingMessage}</p>
+              <div className="w-2 h-4 bg-cyan-400 animate-pulse rounded" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div 
       ref={containerRef}
@@ -105,6 +125,7 @@ export const VirtualizedMessageList: React.FC<VirtualizedMessageListProps> = ({
           {visibleMessages.map((message, index) => renderMessage(message, startIndex + index))}
         </div>
       </div>
+      {renderStreamingMessage()}
     </div>
   );
 };
