@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Send } from 'lucide-react';
@@ -12,24 +12,28 @@ interface MessageInputProps {
   placeholder?: string;
 }
 
-export const MessageInput: React.FC<MessageInputProps> = ({
+export const MessageInput = React.memo<MessageInputProps>(({
   value,
   onChange,
   onSend,
   disabled = false,
   placeholder = "Întrebați despre quantum computing..."
 }) => {
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
+  const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !disabled && value.trim()) {
       onSend();
     }
-  };
+  }, [onSend, disabled, value]);
+
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    onChange(e.target.value);
+  }, [onChange]);
 
   return (
     <div className="flex gap-2 mb-4">
       <Input
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={handleInputChange}
         onKeyPress={handleKeyPress}
         placeholder={placeholder}
         className="bg-white/20 border-white/30 text-white placeholder-gray-300 focus:ring-cyan-400"
@@ -44,4 +48,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       </Button>
     </div>
   );
-};
+});
+
+MessageInput.displayName = 'MessageInput';

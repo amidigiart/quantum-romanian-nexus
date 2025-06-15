@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Zap, Brain, Atom, Search, BarChart3, Beaker } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -10,10 +10,14 @@ interface QuickActionsProps {
   enhanced?: boolean;
 }
 
-export const QuickActions = ({ onActionClick, disabled = false, enhanced = false }: QuickActionsProps) => {
+export const QuickActions = React.memo<QuickActionsProps>(({ 
+  onActionClick, 
+  disabled = false, 
+  enhanced = false 
+}) => {
   const { t } = useLanguage();
 
-  const basicActions = [
+  const basicActions = useMemo(() => [
     { 
       key: 'quick.grover_algorithm', 
       icon: Search, 
@@ -29,9 +33,9 @@ export const QuickActions = ({ onActionClick, disabled = false, enhanced = false
       icon: Zap, 
       variant: 'outline' as const 
     }
-  ];
+  ], []);
 
-  const enhancedActions = [
+  const enhancedActions = useMemo(() => [
     { 
       key: 'quick.quantum_vs_classical', 
       icon: Brain, 
@@ -47,9 +51,16 @@ export const QuickActions = ({ onActionClick, disabled = false, enhanced = false
       icon: Beaker, 
       variant: 'secondary' as const 
     }
-  ];
+  ], []);
 
-  const actions = enhanced ? [...basicActions, ...enhancedActions] : basicActions;
+  const actions = useMemo(() => 
+    enhanced ? [...basicActions, ...enhancedActions] : basicActions,
+    [enhanced, basicActions, enhancedActions]
+  );
+
+  const handleActionClick = useCallback((actionKey: string) => {
+    onActionClick(t(actionKey));
+  }, [onActionClick, t]);
 
   return (
     <div className="mt-4 space-y-2">
@@ -60,7 +71,7 @@ export const QuickActions = ({ onActionClick, disabled = false, enhanced = false
             key={key}
             variant={variant}
             size="sm"
-            onClick={() => onActionClick(t(key))}
+            onClick={() => handleActionClick(key)}
             disabled={disabled}
             className="h-auto p-3 text-xs hover:scale-105 transition-all duration-200 bg-white/5 hover:bg-white/10 border-white/20"
           >
@@ -73,4 +84,6 @@ export const QuickActions = ({ onActionClick, disabled = false, enhanced = false
       </div>
     </div>
   );
-};
+});
+
+QuickActions.displayName = 'QuickActions';
