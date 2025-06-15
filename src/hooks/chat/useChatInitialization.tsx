@@ -1,38 +1,36 @@
 
-import { useEffect } from 'react';
-import { ChatMessage, useChat } from '@/hooks/useChat';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { useChatMessages } from '@/hooks/chat/useChatMessages';
-import { useBotResponses } from '@/hooks/chat/useBotResponses';
-import { useLanguage } from '@/contexts/LanguageContext';
+import { useBotResponses } from './useBotResponses';
+import { ChatMessage } from '@/hooks/useChat';
 
-interface UseChatInitializationProps {
-  useEnhancedMode: boolean;
-}
-
-export const useChatInitialization = ({ useEnhancedMode }: UseChatInitializationProps) => {
+export const useChatInitialization = () => {
   const { user } = useAuth();
-  const { currentConversation } = useChat();
-  const { messages, initializeWithWelcome } = useChatMessages();
-  const { newsContext } = useBotResponses();
-  const { t } = useLanguage();
+  const { updateNewsContext, newsContext } = useBotResponses();
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
-    if (!currentConversation && messages.length === 0 && user) {
-      const welcomeText = t('chat.welcome') + 
-        (useEnhancedMode ? t('chat.enhanced_mode') : '') + 
-        '. Pot să vă ajut cu 10 funcții cuantice hibride: algoritmi Grover/Shor, criptografie cuantică, învățare automată cuantică, optimizare QAOA, simulare VQE, și multe altele.\n\n' +
-        (newsContext ? t('chat.context_news', { context: newsContext }) + '\n\n' : '') +
-        (useEnhancedMode ? t('chat.advanced_mode_active') + '\n\n' : '') +
-        t('chat.how_can_help');
-
-      const welcomeMessage: ChatMessage = {
-        id: '1',
-        text: welcomeText,
-        isBot: true,
-        timestamp: new Date()
-      };
-      initializeWithWelcome(welcomeMessage);
+    if (user && !isInitialized) {
+      // Initialize news context
+      updateNewsContext();
+      setIsInitialized(true);
     }
-  }, [currentConversation, user, messages.length, newsContext, useEnhancedMode, initializeWithWelcome, t]);
+  }, [user, updateNewsContext, isInitialized]);
+
+  const getWelcomeMessage = (): ChatMessage => {
+    const hasNews = newsContext.news && newsContext.news.length > 0;
+    const newsCount = hasNews ? newsContext.news.length : 0;
+    
+    return {
+      id: 'welcome',
+      text: `Bun venit la Chatbot-ul Cuantic Român! 🚀 Sunt aici să vă ajut cu întrebări despre quantum computing. ${hasNews ? `Am ${newsCount} noutăți recente disponibile.` : 'Întrebați-mă orice despre tehnologiile cuantice!'}`,
+      isBot: true,
+      timestamp: new Date()
+    };
+  };
+
+  return {
+    isInitialized,
+    welcomeMessage: getWelcomeMessage()
+  };
 };
