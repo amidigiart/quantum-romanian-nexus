@@ -2,7 +2,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserPreferences } from '@/hooks/useUserPreferences';
-import { supabase } from '@/integrations/supabase/client';
 
 export interface PersonalizationData {
   communicationStyle: 'formal' | 'casual' | 'technical';
@@ -85,21 +84,13 @@ export const PersonalizationProvider: React.FC<{ children: React.ReactNode }> = 
 
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('user_personalization')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error loading personalization data:', error);
-        return;
-      }
-
-      if (data) {
+      // Load from localStorage for now since we don't have the database table
+      const stored = localStorage.getItem(`personalization_${user.id}`);
+      if (stored) {
+        const parsedData = JSON.parse(stored);
         setPersonalizationData({
           ...defaultPersonalization,
-          ...data.personalization_data
+          ...parsedData
         });
       }
     } catch (error) {
@@ -131,13 +122,8 @@ export const PersonalizationProvider: React.FC<{ children: React.ReactNode }> = 
     setPersonalizationData(newData);
 
     try {
-      await supabase
-        .from('user_personalization')
-        .upsert({
-          user_id: user.id,
-          personalization_data: newData,
-          updated_at: new Date().toISOString()
-        });
+      // Store in localStorage for now
+      localStorage.setItem(`personalization_${user.id}`, JSON.stringify(newData));
     } catch (error) {
       console.error('Error updating personalization:', error);
     }
@@ -209,10 +195,7 @@ export const PersonalizationProvider: React.FC<{ children: React.ReactNode }> = 
     setPersonalizationData(defaultPersonalization);
 
     try {
-      await supabase
-        .from('user_personalization')
-        .delete()
-        .eq('user_id', user.id);
+      localStorage.removeItem(`personalization_${user.id}`);
     } catch (error) {
       console.error('Error resetting personalization:', error);
     }

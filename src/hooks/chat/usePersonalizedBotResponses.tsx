@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { usePersonalization } from '@/contexts/PersonalizationContext';
 import { useEnhancedBotResponses } from './useEnhancedBotResponses';
 import { useConversationContext } from './useConversationContext';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
 export const usePersonalizedBotResponses = () => {
@@ -29,9 +28,20 @@ export const usePersonalizedBotResponses = () => {
       // Get final personalized response
       const personalizedResponse = getPersonalizedResponse(baseResponse, message);
 
-      // Save personalized interaction data
+      // Log personalized interaction for now (instead of saving to database)
       if (conversationId && user) {
-        await savePersonalizedInteraction(message, personalizedResponse, conversationId);
+        console.log('Personalized interaction:', {
+          user_id: user.id,
+          conversation_id: conversationId,
+          user_message: message,
+          bot_response: personalizedResponse,
+          personalization_applied: {
+            communication_style: personalizationData.communicationStyle,
+            learning_level: personalizationData.learningLevel,
+            response_length: personalizationData.responseLength,
+            adaptive_settings: personalizationData.adaptiveSettings
+          }
+        });
       }
 
       return personalizedResponse;
@@ -143,35 +153,6 @@ export const usePersonalizedBotResponses = () => {
     });
 
     return [...new Set(related)].slice(0, 3);
-  };
-
-  const savePersonalizedInteraction = async (
-    userMessage: string,
-    botResponse: string,
-    conversationId: string
-  ) => {
-    try {
-      await supabase
-        .from('personalized_interactions')
-        .insert({
-          user_id: user?.id,
-          conversation_id: conversationId,
-          user_message: userMessage,
-          bot_response: botResponse,
-          personalization_applied: {
-            communication_style: personalizationData.communicationStyle,
-            learning_level: personalizationData.learningLevel,
-            response_length: personalizationData.responseLength,
-            adaptive_settings: personalizationData.adaptiveSettings
-          },
-          context_data: {
-            conversation_context: conversationContext,
-            preferred_topics: personalizationData.preferredTopics
-          }
-        });
-    } catch (error) {
-      console.error('Error saving personalized interaction:', error);
-    }
   };
 
   return {
