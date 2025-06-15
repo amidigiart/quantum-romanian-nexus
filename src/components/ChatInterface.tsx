@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -6,9 +7,12 @@ import { useChat, ChatMessage } from '@/hooks/useChat';
 import { useAuth } from '@/hooks/useAuth';
 import { useBotResponses } from '@/hooks/chat/useBotResponses';
 import { useChatMessages } from '@/hooks/chat/useChatMessages';
+import { useRealtimeChat } from '@/hooks/chat/useRealtimeChat';
 import { VirtualizedMessageList } from '@/components/chat/VirtualizedMessageList';
 import { MessageInput } from '@/components/chat/MessageInput';
 import { QuickActions } from '@/components/chat/QuickActions';
+import { PresenceIndicator } from '@/components/chat/PresenceIndicator';
+import { TypingHandler } from '@/components/chat/TypingHandler';
 
 export const ChatInterface = () => {
   const { user } = useAuth();
@@ -28,6 +32,15 @@ export const ChatInterface = () => {
   } = useChatMessages();
   const [inputValue, setInputValue] = useState('');
 
+  // Real-time features
+  const {
+    isConnected,
+    onlineUsers,
+    typingUsers,
+    sendTypingIndicator,
+    updatePresenceStatus
+  } = useRealtimeChat(currentConversation);
+
   // Get cache stats for display
   const cacheStats = getCacheStats();
 
@@ -44,6 +57,15 @@ export const ChatInterface = () => {
     }
   }, [currentConversation, user, messages.length, newsContext]);
 
+  // Handle presence status changes
+  useEffect(() => {
+    if (inputValue.trim()) {
+      updatePresenceStatus('typing');
+    } else {
+      updatePresenceStatus('online');
+    }
+  }, [inputValue, updatePresenceStatus]);
+
   const sendMessage = async () => {
     if (!inputValue.trim() || !user) return;
 
@@ -57,6 +79,9 @@ export const ChatInterface = () => {
     // Optimistically add user message to UI
     addMessage(userMessage, true);
     setInputValue('');
+
+    // Stop typing indicator
+    sendTypingIndicator(false);
 
     // Save message to database in background
     saveMessage(
@@ -139,8 +164,22 @@ export const ChatInterface = () => {
           </Badge>
         )}
       </div>
+
+      {/* Real-time presence indicator */}
+      <PresenceIndicator 
+        onlineUsers={onlineUsers}
+        typingUsers={typingUsers}
+        isConnected={isConnected}
+      />
       
       <VirtualizedMessageList messages={messages} pendingMessages={pendingMessages} />
+
+      {/* Typing indicator handler */}
+      <TypingHandler
+        onTypingChange={sendTypingIndicator}
+        inputValue={inputValue}
+        isEnabled={isConnected && !!currentConversation}
+      />
 
       <MessageInput
         value={inputValue}
