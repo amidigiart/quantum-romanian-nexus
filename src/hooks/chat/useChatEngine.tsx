@@ -1,5 +1,4 @@
-
-import { useReducer, useCallback, useEffect } from 'react';
+import { useReducer, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useChat, ChatMessage } from '@/hooks/useChat';
 import { useBotResponses } from '@/hooks/chat/useBotResponses';
@@ -145,7 +144,7 @@ export const useChatEngine = () => {
     sendTypingIndicator,
     updatePresenceStatus
   } = useRealtimeChat(currentConversation);
-  const { trackEvent, trackUserAction, trackPerformance } = useAnalytics({
+  const { trackEvent, trackUserAction, trackPerformance, componentRef } = useAnalytics({
     component: 'ChatEngine',
     trackClicks: true,
     trackPageViews: true,
@@ -313,6 +312,9 @@ export const useChatEngine = () => {
     cacheStats: getCacheStats(),
     lastUpdated,
     newsContext,
+    
+    // Analytics
+    componentRef,
     
     // Actions
     ...actions
