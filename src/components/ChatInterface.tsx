@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useBotResponses } from '@/hooks/chat/useBotResponses';
 import { useChatMessages } from '@/hooks/chat/useChatMessages';
 import { useRealtimeChat } from '@/hooks/chat/useRealtimeChat';
+import { useAnalytics } from '@/hooks/useAnalytics';
 import { VirtualizedMessageList } from '@/components/chat/VirtualizedMessageList';
 import { MessageInput } from '@/components/chat/MessageInput';
 import { QuickActions } from '@/components/chat/QuickActions';
@@ -31,6 +32,20 @@ export const ChatInterface = () => {
     pendingMessages 
   } = useChatMessages();
   const [inputValue, setInputValue] = useState('');
+
+  // Analytics integration
+  const { 
+    componentRef, 
+    trackEvent, 
+    trackUserAction, 
+    trackPerformance,
+    trackCacheOperation 
+  } = useAnalytics({
+    component: 'ChatInterface',
+    trackClicks: true,
+    trackPageViews: true,
+    trackErrors: true
+  });
 
   // Real-time features
   const {
@@ -69,6 +84,14 @@ export const ChatInterface = () => {
   const sendMessage = async () => {
     if (!inputValue.trim() || !user) return;
 
+    const startTime = performance.now();
+    
+    // Track user action
+    trackUserAction('message_sent', {
+      message_length: inputValue.length,
+      has_conversation: !!currentConversation
+    });
+
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       text: inputValue,
@@ -87,14 +110,35 @@ export const ChatInterface = () => {
     saveMessage(
       userMessage, 
       currentConversation?.id,
-      () => markMessageAsSaved(userMessage.id),
-      (error) => updateMessageOnError(userMessage.id, 'Failed to send message')
+      () => {
+        markMessageAsSaved(userMessage.id);
+        trackEvent('message_saved', { message_id: userMessage.id });
+      },
+      (error) => {
+        updateMessageOnError(userMessage.id, 'Failed to send message');
+        trackEvent('message_save_error', { error: error.message });
+      }
     );
 
     // Generate and add bot response using edge function
     setTimeout(async () => {
       try {
+        const botResponseStartTime = performance.now();
         const botResponseText = await generateBotResponse(inputValue, currentConversation?.id);
+        const botResponseTime = performance.now() - botResponseStartTime;
+        
+        // Track performance
+        trackPerformance('bot_response_generation', botResponseTime, {
+          input_length: inputValue.length,
+          response_length: botResponseText.length
+        });
+
+        // Track cache operation based on response time (heuristic)
+        if (botResponseTime < 100) {
+          trackCacheOperation('hit', inputValue);
+        } else {
+          trackCacheOperation('miss', inputValue);
+        }
         
         const botMessage: ChatMessage = {
           id: (Date.now() + 1).toString(),
@@ -108,8 +152,21 @@ export const ChatInterface = () => {
         
         // Mark as saved since edge function handles database saving
         markMessageAsSaved(botMessage.id);
+        
+        // Track successful bot response
+        trackEvent('bot_response_received', {
+          response_time: botResponseTime,
+          message_id: botMessage.id
+        });
       } catch (error) {
         console.error('Error generating bot response:', error);
+        
+        // Track error
+        trackEvent('bot_response_error', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          input: inputValue.substring(0, 50) // Truncate for privacy
+        });
+        
         const errorMessage: ChatMessage = {
           id: (Date.now() + 1).toString(),
           text: 'Ne pare rău, am întâmpinat o problemă tehnică. Vă rugăm să încercați din nou.',
@@ -118,10 +175,20 @@ export const ChatInterface = () => {
         };
         addMessage(errorMessage, false);
       }
+
+      // Track total interaction time
+      const totalTime = performance.now() - startTime;
+      trackPerformance('complete_message_interaction', totalTime);
     }, 500);
   };
 
   const handleQuickAction = (action: string) => {
+    // Track quick action usage
+    trackUserAction('quick_action_used', {
+      action,
+      action_length: action.length
+    });
+    
     setInputValue(action);
     setTimeout(() => sendMessage(), 100);
   };
@@ -140,7 +207,10 @@ export const ChatInterface = () => {
   }
 
   return (
-    <Card className="bg-white/10 backdrop-blur-lg border-white/20 p-6 quantum-glow">
+    <Card 
+      ref={componentRef}
+      className="bg-white/10 backdrop-blur-lg border-white/20 p-6 quantum-glow"
+    >
       <div className="flex items-center gap-2 mb-4">
         <Bot className="w-6 h-6 text-green-400" />
         <h2 className="text-2xl font-bold text-white">Asistent Cuantic Hibrid</h2>
