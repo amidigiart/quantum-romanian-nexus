@@ -49,8 +49,11 @@ export const useOptimizedConversations = () => {
     try {
       const data = await searchConversations(searchTerm, 50, 0);
       
+      // Ensure data is an array before mapping
+      const conversationsArray = Array.isArray(data) ? data : [];
+      
       // Transform the optimized search results to ChatConversation format
-      const transformedConversations: ChatConversation[] = data.map(conv => ({
+      const transformedConversations: ChatConversation[] = conversationsArray.map(conv => ({
         id: conv.id,
         title: conv.title || `Conversație ${new Date(conv.created_at).toLocaleDateString('ro-RO')}`,
         created_at: conv.created_at,

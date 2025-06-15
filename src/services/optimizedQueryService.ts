@@ -4,9 +4,9 @@ import { supabase } from '@/integrations/supabase/client';
 export class OptimizedQueryService {
   // Batch operations for better performance
   static async batchInsertMessages(messages: any[]) {
-    const { data, error } = await supabase.rpc('batch_insert_messages', {
-      messages: messages
-    });
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .insert(messages);
 
     if (error) throw error;
     return data;
@@ -14,15 +14,27 @@ export class OptimizedQueryService {
 
   // Optimized conversation search with full-text search
   static async searchConversations(userId: string, searchTerm: string, limit: number = 10) {
-    const { data, error } = await supabase.rpc('search_conversations_optimized', {
-      p_user_id: userId,
-      p_search_term: searchTerm,
-      p_limit: limit,
-      p_offset: 0
-    });
+    let query = supabase
+      .from('chat_conversations')
+      .select(`
+        id,
+        title,
+        created_at,
+        updated_at,
+        chat_messages(count)
+      `)
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false })
+      .limit(limit);
+
+    if (searchTerm) {
+      query = query.ilike('title', `%${searchTerm}%`);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
-    return data;
+    return data || [];
   }
 
   // Get conversation statistics efficiently
@@ -69,15 +81,19 @@ export class OptimizedQueryService {
     return data;
   }
 
-  // Clean up old data using the new database function
+  // Clean up old data using direct SQL
   static async cleanupOldData(userId: string, daysToKeep: number = 90) {
-    const { data, error } = await supabase.rpc('cleanup_old_conversations', {
-      p_user_id: userId,
-      p_days_old: daysToKeep
-    });
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
+
+    const { data, error } = await supabase
+      .from('chat_conversations')
+      .delete()
+      .eq('user_id', userId)
+      .lt('updated_at', cutoffDate.toISOString());
 
     if (error) throw error;
-    return data;
+    return data?.length || 0;
   }
 
   // Get messages with quantum data efficiently
