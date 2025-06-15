@@ -1,12 +1,8 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Calculator, Shield, Brain, Atom, Microchip, Newspaper } from 'lucide-react';
-
-interface QuickAction {
-  text: string;
-  action: string;
-}
+import { Zap, Brain, Atom, Search, BarChart3, Flask } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface QuickActionsProps {
   onActionClick: (action: string) => void;
@@ -14,42 +10,67 @@ interface QuickActionsProps {
   enhanced?: boolean;
 }
 
-export const QuickActions: React.FC<QuickActionsProps> = ({ 
-  onActionClick, 
-  disabled = false, 
-  enhanced = false 
-}) => {
-  const quickActions: QuickAction[] = [
-    { text: 'Algoritmi Cuantici', action: 'Explică-mi algoritmii Grover și Shor cu ultimele dezvoltări' },
-    { text: 'Criptografie Cuantică', action: 'Cum funcționează protocolul BB84 și adoptarea industrială?' },
-    { text: 'Quantum ML', action: 'Care sunt ultimele progrese în învățarea automată cuantică?' },
-    { text: 'Optimizare QAOA', action: 'Explică algoritmul QAOA cu exemple concrete' },
-    { text: 'Simulare Cuantică', action: 'Cum simulez sisteme cuantice la temperatura camerei?' },
-    { text: 'Ultimele Știri', action: 'Care sunt ultimele dezvoltări în quantum computing?' }
+export const QuickActions = ({ onActionClick, disabled = false, enhanced = false }: QuickActionsProps) => {
+  const { t } = useLanguage();
+
+  const basicActions = [
+    { 
+      key: 'quick.grover_algorithm', 
+      icon: Search, 
+      variant: 'secondary' as const
+    },
+    { 
+      key: 'quick.quantum_cryptography', 
+      icon: Atom, 
+      variant: 'secondary' as const 
+    },
+    { 
+      key: 'quick.latest_quantum_news', 
+      icon: Zap, 
+      variant: 'outline' as const 
+    }
   ];
 
-  const icons = [Calculator, Shield, Brain, Atom, Microchip, Newspaper];
+  const enhancedActions = [
+    { 
+      key: 'quick.quantum_vs_classical', 
+      icon: Brain, 
+      variant: 'secondary' as const 
+    },
+    { 
+      key: 'quick.system_status', 
+      icon: BarChart3, 
+      variant: 'outline' as const 
+    },
+    { 
+      key: 'quick.vqe_chemistry', 
+      icon: Flask, 
+      variant: 'secondary' as const 
+    }
+  ];
+
+  const actions = enhanced ? [...basicActions, ...enhancedActions] : basicActions;
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
-      {quickActions.map((action, index) => {
-        const IconComponent = icons[index];
-        return (
+    <div className="mt-4 space-y-2">
+      <p className="text-sm text-gray-400 font-medium">Quick Actions:</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+        {actions.map(({ key, icon: Icon, variant }) => (
           <Button
-            key={index}
-            variant="outline"
+            key={key}
+            variant={variant}
             size="sm"
-            onClick={() => onActionClick(action.action)}
+            onClick={() => onActionClick(t(key))}
             disabled={disabled}
-            className={`border-white/30 text-white hover:bg-white/20 transition-all hover:scale-105 text-xs ${
-              enhanced ? 'border-cyan-400/50 text-cyan-100' : ''
-            }`}
+            className="h-auto p-3 text-xs hover:scale-105 transition-all duration-200 bg-white/5 hover:bg-white/10 border-white/20"
           >
-            <IconComponent className="w-3 h-3 mr-1" />
-            {action.text}
+            <div className="flex items-center gap-2 text-left">
+              <Icon className="w-4 h-4 flex-shrink-0" />
+              <span className="truncate">{t(key)}</span>
+            </div>
           </Button>
-        );
-      })}
+        ))}
+      </div>
     </div>
   );
 };

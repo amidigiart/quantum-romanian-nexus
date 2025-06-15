@@ -14,8 +14,11 @@ import { useChatHandlers } from '@/components/chat/useChatHandlers';
 import { AIProviderSelector, AI_PROVIDERS } from '@/components/chat/AIProviderSelector';
 import { useMultiProviderBotResponses } from '@/hooks/chat/useMultiProviderBotResponses';
 import { useEnhancedBotResponses } from '@/hooks/chat/useEnhancedBotResponses';
+import { LanguageSelector } from '@/components/common/LanguageSelector';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export const ChatInterface = () => {
+  const { t } = useLanguage();
   const {
     inputValue,
     setInputValue,
@@ -52,11 +55,16 @@ export const ChatInterface = () => {
       ref={componentRef}
       className="bg-white/10 backdrop-blur-lg border-white/20 p-6 quantum-glow"
     >
-      <ChatHeader 
-        useEnhancedMode={useEnhancedMode}
-        cacheHitRate={cacheStats.hitRate}
-        lastUpdated={lastUpdated}
-      />
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex-1">
+          <ChatHeader 
+            useEnhancedMode={useEnhancedMode}
+            cacheHitRate={cacheStats.hitRate}
+            lastUpdated={lastUpdated}
+          />
+        </div>
+        <LanguageSelector />
+      </div>
 
       <AIProviderSelector
         selectedProvider={selectedProvider}
@@ -76,7 +84,7 @@ export const ChatInterface = () => {
           onClick={() => setShowQualityMetrics(!showQualityMetrics)}
           className="text-xs text-gray-400 hover:text-white transition-colors"
         >
-          {showQualityMetrics ? 'Hide' : 'Show'} Analytics
+          {t('analytics.show_hide', { action: showQualityMetrics ? 'Hide' : 'Show' })}
         </button>
       </div>
 
@@ -106,8 +114,8 @@ export const ChatInterface = () => {
         onSend={sendMessage}
         disabled={!user}
         placeholder={useEnhancedMode ? 
-          "Întrebați cu AI avansat despre quantum computing..." : 
-          "Întrebați despre quantum computing, ultimele știri, senzori IoT..."
+          t('chat.placeholder_enhanced') : 
+          t('chat.placeholder_basic')
         }
       />
 
