@@ -1,10 +1,8 @@
 
 import { useState, useCallback } from 'react';
 import { ChatMessage } from '@/hooks/useChat';
-import { performanceMonitoringService } from '@/services/performanceMonitoringService';
 import { useStreamingResponse } from './useStreamingResponse';
-import { StreamingBotService } from '@/services/streamingBotService';
-import { requestDeduplicationService } from '@/services/requestDeduplicationService';
+import { useUnifiedMessageProcessor } from './useUnifiedMessageProcessor';
 
 interface UseOptimizedChatHandlersProps {
   user: any;
@@ -51,103 +49,42 @@ export const useOptimizedChatHandlers = ({
     }
   });
 
+  const { processMessage, cancelMessage, getPendingCount } = useUnifiedMessageProcessor({
+    conversationId: 'current-conversation-id',
+    onMessageAdd: addMessage,
+    onMessageSave: saveBatchedMessage,
+    onMemoryCheck: checkMemoryPressure,
+    onStreamStart: startStreaming,
+    onStreamChunk: appendToStream,
+    onStreamComplete: completeStreaming,
+    onStreamError: cancelStreaming
+  });
+
   const sendMessage = useCallback(async () => {
     if (!inputValue.trim() || !user || isGenerating || isStreaming) return;
 
-    // Check if request is already pending
-    if (StreamingBotService.isRequestPending(inputValue, user.id, 'current-conversation-id')) {
-      console.log('Request already pending, ignoring duplicate');
-      return;
-    }
+    const messageText = inputValue;
+    setInputValue('');
 
-    return performanceMonitoringService.measureOperation('send_message_streaming', async () => {
-      const userMessage: ChatMessage = {
-        id: Date.now().toString(),
-        text: inputValue,
-        isBot: false,
-        timestamp: new Date()
-      };
-
-      addMessage(userMessage, true);
-      const messageText = inputValue;
-      setInputValue('');
-
-      // Save user message
-      saveBatchedMessage(
-        userMessage,
-        'current-conversation-id',
-        {
-          priority: 'normal',
-          onSuccess: () => console.log('User message saved'),
-          onError: (error: any) => console.error('Failed to save user message:', error)
-        }
-      );
-
-      try {
-        // Start streaming response with deduplication
-        const streamingMessageId = (Date.now() + 1).toString();
-        startStreaming(streamingMessageId);
-
-        await StreamingBotService.generateStreamingResponse(
-          {
-            message: messageText,
-            conversationId: 'current-conversation-id',
-            userId: user?.id,
-            context: {
-              recentMessages: [],
-              topics: [],
-              userPreferences: []
-            }
-          },
-          (chunk: string) => {
-            appendToStream(chunk);
-          },
-          () => {
-            completeStreaming();
-            checkMemoryPressure();
-          },
-          (error: Error) => {
-            console.error('Streaming error:', error);
-            cancelStreaming();
-            
-            // Fallback to regular response
-            const errorMessage: ChatMessage = {
-              id: streamingMessageId,
-              text: 'Ne pare rău, am întâmpinat o problemă tehnică. Vă rugăm să încercați din nou.',
-              isBot: true,
-              timestamp: new Date()
-            };
-            addMessage(errorMessage, false);
-          }
-        );
-        
-      } catch (error) {
-        console.error('Error sending message:', error);
-        cancelStreaming();
-      }
-    });
-  }, [inputValue, user, isGenerating, isStreaming, addMessage, saveBatchedMessage, checkMemoryPressure, startStreaming, appendToStream, completeStreaming, cancelStreaming]);
+    await processMessage(messageText);
+  }, [inputValue, user, isGenerating, isStreaming, processMessage]);
 
   const handleQuickAction = useCallback((action: string) => {
     // Cancel any pending request for the previous input
     if (inputValue.trim() && user) {
-      StreamingBotService.cancelRequest(inputValue, user.id, 'current-conversation-id');
+      cancelMessage(inputValue);
     }
     
     setInputValue(action);
     setTimeout(() => sendMessage(), 100);
-  }, [inputValue, user, sendMessage]);
+  }, [inputValue, user, sendMessage, cancelMessage]);
 
   const cancelCurrentRequest = useCallback(() => {
     if (inputValue.trim() && user) {
-      StreamingBotService.cancelRequest(inputValue, user.id, 'current-conversation-id');
+      cancelMessage(inputValue);
       cancelStreaming();
     }
-  }, [inputValue, user, cancelStreaming]);
-
-  const getPendingRequestsCount = useCallback(() => {
-    return requestDeduplicationService.getPendingRequestsCount();
-  }, []);
+  }, [inputValue, user, cancelMessage, cancelStreaming]);
 
   return {
     inputValue,
@@ -157,6 +94,6 @@ export const useOptimizedChatHandlers = ({
     streamingMessage,
     isStreaming,
     cancelCurrentRequest,
-    getPendingRequestsCount
+    getPendingRequestsCount: getPendingCount
   };
 };

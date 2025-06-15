@@ -5,6 +5,7 @@ import { useChat, ChatMessage } from '@/hooks/useChat';
 import { useChatMessages } from '@/hooks/chat/useChatMessages';
 import { useMultiProviderBotResponses } from '@/hooks/chat/useMultiProviderBotResponses';
 import { useAnalytics } from '@/hooks/useAnalytics';
+import { useUnifiedMessageProcessor } from './useUnifiedMessageProcessor';
 
 export const useEnhancedChatLogic = () => {
   const { user } = useAuth();
@@ -49,60 +50,39 @@ export const useEnhancedChatLogic = () => {
     }
   }, [currentConversation, user, messages.length, createWelcomeMessage, initializeWithWelcome]);
 
-  // Memoized message sending logic
+  // Use unified message processor for enhanced logic
+  const { processMessage } = useUnifiedMessageProcessor({
+    conversationId: currentConversation?.id,
+    onMessageAdd: addMessage,
+    onMessageSave: (message, conversationId, options) => {
+      saveMessage(
+        message,
+        conversationId,
+        () => {
+          markMessageAsSaved(message.id);
+          options.onSuccess?.();
+        },
+        (error) => {
+          updateMessageOnError(message.id, 'Failed to send');
+          options.onError?.(error);
+        }
+      );
+    },
+    onMemoryCheck: () => {},
+    onStreamStart: () => {},
+    onStreamChunk: (chunk) => setStreamingMessage(prev => prev + chunk),
+    onStreamComplete: () => setStreamingMessage(''),
+    onStreamError: () => setStreamingMessage('')
+  });
+
   const sendEnhancedMessage = useCallback(async () => {
     if (!inputValue.trim() || !user) return;
 
-    const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      text: inputValue,
-      isBot: false,
-      timestamp: new Date()
-    };
-
-    addMessage(userMessage, true);
-    const messageToProcess = inputValue;
+    const messageText = inputValue;
     setInputValue('');
 
-    // Save user message
-    saveMessage(
-      userMessage, 
-      currentConversation?.id,
-      () => markMessageAsSaved(userMessage.id),
-      (error) => updateMessageOnError(userMessage.id, 'Failed to send message')
-    );
-
-    // Generate AI response with selected provider
-    setTimeout(async () => {
-      try {
-        const botResponseText = await generateResponseWithProvider(
-          messageToProcess,
-          { provider: selectedProvider, model: selectedModel },
-          currentConversation?.id
-        );
-        
-        const finalBotMessage: ChatMessage = {
-          id: (Date.now() + 1).toString(),
-          text: botResponseText,
-          isBot: true,
-          timestamp: new Date()
-        };
-        
-        addMessage(finalBotMessage, true);
-        markMessageAsSaved(finalBotMessage.id);
-      } catch (error) {
-        console.error('Enhanced response error:', error);
-        
-        const errorMessage: ChatMessage = {
-          id: (Date.now() + 1).toString(),
-          text: `🔧 Sistemul AI ${selectedProvider} întâmpină dificultăți tehnice. Vă rugăm să încercați cu alt provider sau să verificați configurația.`,
-          isBot: true,
-          timestamp: new Date()
-        };
-        addMessage(errorMessage, false);
-      }
-    }, 300);
-  }, [inputValue, user, addMessage, saveMessage, currentConversation, markMessageAsSaved, updateMessageOnError, generateResponseWithProvider, selectedProvider, selectedModel]);
+    await processMessage(messageText);
+  }, [inputValue, user, processMessage]);
 
   const handleQuickAction = useCallback((action: string) => {
     trackEvent('enhanced_quick_action', { action, enhanced_mode: isEnhancedMode });

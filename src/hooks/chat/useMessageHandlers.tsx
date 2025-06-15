@@ -3,8 +3,8 @@ import { useCallback } from 'react';
 import { ChatMessage, useChat } from '@/hooks/useChat';
 import { useAuth } from '@/hooks/useAuth';
 import { useChatMessages } from '@/hooks/chat/useChatMessages';
-import { useBotResponses } from '@/hooks/chat/useBotResponses';
 import { useAnalytics } from '@/hooks/useAnalytics';
+import { useUnifiedMessageProcessor } from './useUnifiedMessageProcessor';
 
 interface UseMessageHandlersProps {
   useEnhancedMode: boolean;
@@ -21,18 +21,42 @@ export const useMessageHandlers = ({
 }: UseMessageHandlersProps) => {
   const { user } = useAuth();
   const { saveMessage, currentConversation } = useChat();
-  const { generateBotResponse } = useBotResponses();
   const { 
     addMessage, 
     markMessageAsSaved, 
     updateMessageOnError
   } = useChatMessages();
   
-  const { trackEvent, trackUserAction, trackPerformance, trackCacheOperation } = useAnalytics({
+  const { trackEvent, trackUserAction, trackPerformance } = useAnalytics({
     component: 'MessageHandlers',
     trackClicks: true,
     trackPageViews: true,
     trackErrors: true
+  });
+
+  // Use unified message processor for consistency
+  const { processMessage } = useUnifiedMessageProcessor({
+    conversationId: currentConversation?.id,
+    onMessageAdd: (message, shouldSave) => addMessage(message, shouldSave),
+    onMessageSave: (message, conversationId, options) => {
+      saveMessage(
+        message,
+        conversationId,
+        () => {
+          markMessageAsSaved(message.id);
+          options.onSuccess?.();
+        },
+        (error) => {
+          updateMessageOnError(message.id, 'Failed to send');
+          options.onError?.(error);
+        }
+      );
+    },
+    onMemoryCheck: () => {}, // No memory check needed in basic handler
+    onStreamStart: () => {},
+    onStreamChunk: () => {},
+    onStreamComplete: () => {},
+    onStreamError: () => {}
   });
 
   const sendMessage = useCallback(async () => {
@@ -46,85 +70,17 @@ export const useMessageHandlers = ({
       enhanced_mode: useEnhancedMode
     });
 
-    const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      text: inputValue,
-      isBot: false,
-      timestamp: new Date()
-    };
-
-    addMessage(userMessage, true);
+    const messageText = inputValue;
     setInputValue('');
     sendTypingIndicator(false);
 
-    saveMessage(
-      userMessage, 
-      currentConversation?.id,
-      () => {
-        markMessageAsSaved(userMessage.id);
-        trackEvent('message_saved', { message_id: userMessage.id });
-      },
-      (error) => {
-        updateMessageOnError(userMessage.id, 'Failed to send message');
-        trackEvent('message_save_error', { error: error.message });
-      }
-    );
-
-    setTimeout(async () => {
-      try {
-        const botResponseStartTime = performance.now();
-        const botResponseText = await generateBotResponse(inputValue, currentConversation?.id);
-        const botResponseTime = performance.now() - botResponseStartTime;
-        
-        trackPerformance('bot_response_generation', botResponseTime, {
-          input_length: inputValue.length,
-          response_length: botResponseText.length,
-          enhanced_mode: useEnhancedMode
-        });
-
-        if (botResponseTime < 100) {
-          trackCacheOperation('hit', inputValue);
-        } else {
-          trackCacheOperation('miss', inputValue);
-        }
-        
-        const botMessage: ChatMessage = {
-          id: (Date.now() + 1).toString(),
-          text: botResponseText,
-          isBot: true,
-          timestamp: new Date()
-        };
-        
-        addMessage(botMessage, true);
-        markMessageAsSaved(botMessage.id);
-        
-        trackEvent('bot_response_received', {
-          response_time: botResponseTime,
-          message_id: botMessage.id,
-          enhanced_mode: useEnhancedMode
-        });
-      } catch (error) {
-        console.error('Error generating bot response:', error);
-        
-        trackEvent('bot_response_error', {
-          error: error instanceof Error ? error.message : 'Unknown error',
-          input: inputValue.substring(0, 50),
-          enhanced_mode: useEnhancedMode
-        });
-        
-        const errorMessage: ChatMessage = {
-          id: (Date.now() + 1).toString(),
-          text: 'Ne pare rău, am întâmpinat o problemă tehnică. Vă rugăm să încercați din nou.',
-          isBot: true,
-          timestamp: new Date()
-        };
-        addMessage(errorMessage, false);
-      }
-
+    const success = await processMessage(messageText);
+    
+    if (success) {
       const totalTime = performance.now() - startTime;
       trackPerformance('complete_message_interaction', totalTime);
-    }, 500);
-  }, [inputValue, user, currentConversation, useEnhancedMode, addMessage, setInputValue, sendTypingIndicator, saveMessage, markMessageAsSaved, updateMessageOnError, generateBotResponse, trackEvent, trackUserAction, trackPerformance, trackCacheOperation]);
+    }
+  }, [inputValue, user, currentConversation, useEnhancedMode, setInputValue, sendTypingIndicator, processMessage, trackEvent, trackUserAction, trackPerformance]);
 
   const handleQuickAction = useCallback((action: string) => {
     trackUserAction('quick_action_used', {
