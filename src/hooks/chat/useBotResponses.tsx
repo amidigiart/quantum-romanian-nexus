@@ -1,167 +1,196 @@
+import { useState, useCallback } from 'react';
 import { useQuantumNews } from '@/hooks/useQuantumNews';
-import { unifiedCacheManager } from '@/services/cache/unifiedCacheManager';
-import { cacheWarmingService } from '@/services/cache/cacheWarmingService';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
+import { responseCacheService } from '@/services/responseCacheService';
+import { cachePerformanceMonitor } from '@/services/cachePerformanceMonitor';
+import { useConversationContext } from './useConversationContext';
+import {
+  ConversationContext,
+  EnhancedResponseMetrics,
+  NewsContext
+} from './types/conversationTypes';
+import { assessResponseQuality } from './utils/responseQuality';
+import { generateIntelligentFallback } from './utils/fallbackResponses';
+import { advancedCacheService } from '@/services/advancedCacheService';
+import { cacheHitOptimizer } from '@/services/cache/cacheHitOptimizer';
+import { optimizedCacheWarmingService } from '@/services/cache/optimizedCacheWarmingService';
 
 export const useBotResponses = () => {
-  const { getNewsResponse, newsContext, lastUpdated } = useQuantumNews();
   const { user } = useAuth();
+  const { toast } = useToast();
+  const [isWarming, setIsWarming] = useState(false);
+  const [newsContext, setNewsContext] = useState<NewsContext>({
+    news: [],
+    lastUpdated: null,
+  });
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const { conversationContext } = useConversationContext();
+  const [responseMetrics, setResponseMetrics] = useState<EnhancedResponseMetrics | null>(null);
 
-  const generateBotResponse = async (message: string, conversationId?: string): Promise<string> => {
-    // Use unified cache with intelligent key generation
-    const cacheKey = `bot-response:${message.toLowerCase().substring(0, 100)}`;
-    const cachedResponse = await unifiedCacheManager.get<string>(
-      cacheKey, 
-      ['chat-response', 'bot-generated']
-    );
-    
-    if (cachedResponse) {
-      // Prefetch related content in background
-      cacheWarmingService.prefetchRelatedContent(message);
-      return cachedResponse;
-    }
-
+  const updateNewsContext = useCallback(async () => {
     try {
-      // Check for news responses first
-      const newsResponse = getNewsResponse(message);
-      if (newsResponse) {
-        await unifiedCacheManager.set(
-          cacheKey, 
-          newsResponse, 
-          2 * 60 * 1000, // 2 minutes TTL for news
-          ['chat-response', 'news', 'time-sensitive'],
-          'high'
-        );
-        return newsResponse;
-      }
-
-      // Use edge function for bot response generation
-      const { data, error } = await supabase.functions.invoke('generate-bot-response', {
-        body: { message, conversationId, userId: user?.id }
-      });
+      const { data, error } = await supabase
+        .from('quantum_news')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(5);
 
       if (error) {
-        console.error('Edge function error:', error);
-        return generateLocalFallback(message);
+        console.error("Failed to fetch quantum news:", error);
+        return;
       }
 
-      const response = data.response;
-      
-      // Intelligent caching based on query type
-      const isAlgorithmQuery = message.toLowerCase().includes('algoritm') || 
-                             message.toLowerCase().includes('quantum');
-      const priority = isAlgorithmQuery ? 'high' : 'medium';
-      const ttl = isAlgorithmQuery ? 15 * 60 * 1000 : 10 * 60 * 1000;
-      const tags = ['chat-response', 'bot-generated'];
-      
-      if (isAlgorithmQuery) tags.push('algorithms');
-      
-      await unifiedCacheManager.set(cacheKey, response, ttl, tags, priority);
-
-      // Prefetch related content
-      cacheWarmingService.prefetchRelatedContent(message);
-
-      return response;
+      setNewsContext({
+        news: data || [],
+        lastUpdated: new Date(),
+      });
+      setLastUpdated(new Date());
     } catch (error) {
-      console.error('Error calling bot response edge function:', error);
-      return generateLocalFallback(message);
+      console.error("Error updating news context:", error);
+    }
+  }, []);
+
+  const getNewsResponse = (message: string): string | null => {
+    const normalizedMessage = message.toLowerCase();
+
+    if (normalizedMessage.includes('știri quantum') || normalizedMessage.includes('ultimele noutăți')) {
+      if (!newsContext.news || newsContext.news.length === 0) {
+        return "Nu există noutăți disponibile momentan.";
+      }
+
+      const newsItems = newsContext.news.map((item, index) =>
+        `${index + 1}. ${item.title} - ${item.summary}`
+      ).join('\n');
+
+      return `Ultimele noutăți quantum:\n${newsItems}\nData actualizării: ${lastUpdated?.toLocaleDateString()}`;
+    }
+
+    return null;
+  };
+
+  const warmFrequentlyAskedQuestions = async () => {
+    setIsWarming(true);
+    try {
+      const commonQuestions = [
+        "Ce este quantum computing?",
+        "Cum funcționează un computer cuantic?",
+        "Care sunt avantajele quantum computing?",
+        "Care sunt dezavantajele quantum computing?",
+        "Care este viitorul quantum computing?"
+      ];
+
+      for (const question of commonQuestions) {
+        // Invoke the edge function directly to cache the responses
+        await supabase.functions.invoke('cached-bot-response', {
+          body: { message: question, userId: user?.id }
+        });
+      }
+      toast({
+        title: "Cache preîncărcat",
+        description: "Întrebările frecvente au fost preîncărcate în cache.",
+      });
+    } catch (error) {
+      console.error("Failed to warm cache:", error);
+      toast({
+        title: "Eroare",
+        description: "Nu s-au putut preîncărca întrebările frecvente.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsWarming(false);
     }
   };
 
-  const generateCachedBotResponse = async (message: string): Promise<string> => {
-    const cacheKey = `faq-response:${message}`;
-    const cachedResponse = await unifiedCacheManager.get<string>(
-      cacheKey,
-      ['chat-response', 'faq', 'static']
-    );
+  const clearResponseCache = () => {
+    responseCacheService.clearCache();
+    toast({
+      title: "Cache șters",
+      description: "Cache-ul de răspunsuri a fost golit cu succes.",
+    });
+  };
 
+  const getCacheStats = () => {
+    return responseCacheService.getCacheStats();
+  };
+
+  const getAdvancedCacheMetrics = () => {
+    return advancedCacheService.getMetrics();
+  };
+
+  const generateBotResponse = async (message: string, conversationId?: string): Promise<string> => {
+    const startTime = performance.now();
+    
+    // Use optimized cache retrieval
+    const cachedResponse = await cacheHitOptimizer.optimizedGet<string>(
+      message.toLowerCase().trim(),
+      message,
+      { userExpertiseLevel: 'general', preferredResponseStyle: 'concise', topics: [], userPreferences: [] },
+      user?.id,
+      ['chat-response']
+    );
+    
     if (cachedResponse) {
+      cachePerformanceMonitor.recordCacheHit(message, 'response', performance.now() - startTime);
       return cachedResponse;
     }
 
     try {
+      if (message.toLowerCase().includes('știri quantum') || message.toLowerCase().includes('ultimele noutăți')) {
+        return getNewsResponse(message) || "Nu există noutăți disponibile momentan.";
+      }
+
+      // Generate response using edge function
       const { data, error } = await supabase.functions.invoke('cached-bot-response', {
         body: { message, userId: user?.id }
       });
 
-      if (error) {
-        console.error('Cached edge function error:', error);
-        return generateLocalFallback(message);
-      }
+      if (error) throw error;
 
       const response = data.response;
       
-      // Cache FAQ responses with longer TTL
-      await unifiedCacheManager.set(
-        cacheKey,
+      // Use optimized cache storage
+      await cacheHitOptimizer.optimizedSet(
+        message.toLowerCase().trim(),
         response,
-        30 * 60 * 1000, // 30 minutes TTL
-        ['chat-response', 'faq', 'static'],
-        'high'
+        message,
+        { userExpertiseLevel: 'general', preferredResponseStyle: 'concise', topics: [], userPreferences: [] },
+        user?.id,
+        10 * 60 * 1000, // 10 minutes
+        ['chat-response'],
+        'medium'
       );
 
+      cachePerformanceMonitor.recordCacheHit(message, 'response', performance.now() - startTime);
       return response;
     } catch (error) {
-      console.error('Error calling cached bot response edge function:', error);
-      return generateLocalFallback(message);
+      console.error("Failed to generate bot response:", error);
+      cachePerformanceMonitor.recordCacheMiss(message, 'response', performance.now() - startTime);
+      return generateIntelligentFallback(message, conversationContext);
     }
   };
 
-  const generateLocalFallback = (message: string): string => {
-    const lowerMessage = message.toLowerCase();
-    
-    if (lowerMessage.includes('algoritm') || lowerMessage.includes('grover') || lowerMessage.includes('shor')) {
-      return `Am implementat 10 algoritmi cuantici avansați: Grover pentru căutare (O(√N)), Shor pentru factorizare (O((log N)³)), QAOA pentru optimizare, VQE pentru energie, QML pentru învățare automată, QRNG pentru generare aleatoare, QFT pentru transformate, QEC pentru corecția erorilor, simulare cuantică, și optimizare de portofoliu.\n\nCare vă interesează în mod specific?`;
-    }
-    
-    return `Înțeleg întrebarea dvs. despre computarea cuantică avansată. Sistemul nostru implementează 10 funcții cuantice hibride principale.\n\nCu ce anume vă pot ajuta în mod specific?`;
+  const assessResponse = async (message: string, response: string) => {
+    return assessResponseQuality(message, response, conversationContext);
   };
 
-  const clearResponseCache = () => {
-    unifiedCacheManager.clearAll();
-  };
-
-  const getCacheStats = () => {
-    const detailedMetrics = unifiedCacheManager.getMetrics();
-    // Return compatible format for existing UI
-    return {
-      totalQueries: detailedMetrics.totalSize,
-      cacheHits: Math.round(detailedMetrics.hitRate),
-      cacheMisses: Math.round(detailedMetrics.missRate),
-      hitRate: detailedMetrics.hitRate
-    };
-  };
-
-  const getAdvancedCacheMetrics = () => {
-    return unifiedCacheManager.getMetrics();
-  };
-
-  const warmFrequentlyAskedQuestions = async () => {
-    await cacheWarmingService.warmFrequentlyAskedQuestions();
-  };
-
-  const performStartupWarming = async () => {
-    await cacheWarmingService.performStartupWarming();
-  };
-
-  const warmUserContent = async (preferences: string[] = [], expertiseLevel: 'beginner' | 'intermediate' | 'advanced' = 'intermediate') => {
-    await Promise.all([
-      cacheWarmingService.warmUserContextualContent(preferences),
-      cacheWarmingService.warmExpertiseLevelContent(expertiseLevel)
-    ]);
+  const getCacheOptimizationStats = () => {
+    return cacheHitOptimizer.getOptimizationMetrics();
   };
 
   return {
     generateBotResponse,
-    generateCachedBotResponse,
-    newsContext,
-    lastUpdated,
+    getNewsResponse,
+    updateNewsContext,
+    warmFrequentlyAskedQuestions,
     clearResponseCache,
     getCacheStats,
     getAdvancedCacheMetrics,
-    warmFrequentlyAskedQuestions,
-    performStartupWarming,
-    warmUserContent
+    isWarming,
+    assessResponse,
+    newsContext,
+    lastUpdated,
+    getCacheOptimizationStats
   };
 };

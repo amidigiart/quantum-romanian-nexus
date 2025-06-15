@@ -7,8 +7,9 @@ import { useState } from 'react';
 import { useConversationContext } from './useConversationContext';
 import { EnhancedResponseMetrics } from './types/conversationTypes';
 import { assessAdvancedResponseQuality, predictUserSatisfaction } from './utils/responseQuality';
-import { generateAdvancedCacheKey } from './utils/cacheUtils';
 import { generateIntelligentFallback, enhanceWithAdvancedContext, generateExpertiseLevelOverview, generateContextualAlgorithmsGuide } from './utils/fallbackResponses';
+import { cacheHitOptimizer } from '@/services/cache/cacheHitOptimizer';
+import { optimizedCacheWarmingService } from '@/services/cache/optimizedCacheWarmingService';
 
 export const useEnhancedBotResponses = () => {
   const { getNewsResponse, newsContext, lastUpdated } = useQuantumNews();
@@ -24,10 +25,12 @@ export const useEnhancedBotResponses = () => {
   ): Promise<string> => {
     const startTime = performance.now();
     
-    // Enhanced cache key with user context
-    const contextKey = generateAdvancedCacheKey(message, conversationContext);
-    const cachedResponse = await advancedCacheService.get<string>(
-      contextKey, 
+    // Use optimized cache retrieval
+    const cachedResponse = await cacheHitOptimizer.optimizedGet<string>(
+      `legacy-${message}`, // fallback key
+      message,
+      conversationContext,
+      user?.id,
       ['chat-response', 'enhanced', 'contextual', `expertise-${conversationContext.userExpertiseLevel}`]
     );
     
@@ -48,13 +51,19 @@ export const useEnhancedBotResponses = () => {
       const newsResponse = getNewsResponse(message);
       if (newsResponse) {
         const enhancedNewsResponse = await enhanceWithAdvancedContext(newsResponse, conversationContext);
-        await advancedCacheService.set(
-          contextKey, 
-          enhancedNewsResponse, 
+        
+        // Use optimized cache storage
+        await cacheHitOptimizer.optimizedSet(
+          `legacy-news-${message}`,
+          enhancedNewsResponse,
+          message,
+          conversationContext,
+          user?.id,
           3 * 60 * 1000,
           ['chat-response', 'news', 'enhanced', `expertise-${conversationContext.userExpertiseLevel}`],
           'high'
         );
+        
         updateConversationContext(message, enhancedNewsResponse);
         
         const metrics: EnhancedResponseMetrics = {
@@ -98,14 +107,15 @@ export const useEnhancedBotResponses = () => {
       const response = data.response;
       const quality = assessAdvancedResponseQuality(message, response, conversationContext);
       
-      // Enhanced caching with quality-based TTL
-      const ttl = quality.relevance > 0.9 ? 20 * 60 * 1000 : 12 * 60 * 1000;
+      // Use optimized cache storage with quality-based priority
       const priority = quality.relevance > 0.85 ? 'high' : 'medium';
-      
-      await advancedCacheService.set(
-        contextKey,
+      await cacheHitOptimizer.optimizedSet(
+        `legacy-response-${message}`,
         response,
-        ttl,
+        message,
+        conversationContext,
+        user?.id,
+        undefined, // Let optimizer calculate optimal TTL
         ['chat-response', 'enhanced', `quality-${Math.round(quality.relevance * 10)}`, `expertise-${conversationContext.userExpertiseLevel}`],
         priority
       );
@@ -163,25 +173,19 @@ export const useEnhancedBotResponses = () => {
   };
 
   const warmAdvancedCache = async () => {
-    const expertiseLevels = ['beginner', 'intermediate', 'advanced'];
-    const cacheStrategies = expertiseLevels.flatMap(level => [
-      {
-        key: `enhanced-quantum-overview-${level}`,
-        dataLoader: async () => generateExpertiseLevelOverview(level as any),
-        ttl: 25 * 60 * 1000,
-        tags: ['chat-response', 'enhanced', 'overview', `expertise-${level}`],
-        priority: 'high' as const
-      },
-      {
-        key: `contextual-algorithms-guide-${level}`,
-        dataLoader: async () => generateContextualAlgorithmsGuide(level as any),
-        ttl: 30 * 60 * 1000,
-        tags: ['chat-response', 'enhanced', 'algorithms', `expertise-${level}`],
-        priority: 'high' as const
-      }
-    ]);
+    console.log('Starting advanced cache warming with optimizations...');
+    
+    // Use the optimized warming service
+    await optimizedCacheWarmingService.warmFrequentPatterns();
+    
+    // Schedule periodic warming
+    optimizedCacheWarmingService.schedulePeriodicWarming();
+    
+    console.log('Advanced cache warming completed');
+  };
 
-    await advancedCacheService.warmCache(cacheStrategies);
+  const getCacheOptimizationMetrics = () => {
+    return cacheHitOptimizer.getOptimizationMetrics();
   };
 
   return {
@@ -192,6 +196,7 @@ export const useEnhancedBotResponses = () => {
     warmAdvancedCache,
     newsContext,
     lastUpdated,
-    responseMetrics
+    responseMetrics,
+    getCacheOptimizationMetrics
   };
 };
