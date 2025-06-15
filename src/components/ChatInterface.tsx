@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Bot, Atom, Newspaper } from 'lucide-react';
+import { Bot, Atom, Newspaper, Zap } from 'lucide-react';
 import { useChat, ChatMessage } from '@/hooks/useChat';
 import { useAuth } from '@/hooks/useAuth';
 import { useBotResponses } from '@/hooks/chat/useBotResponses';
@@ -17,7 +17,7 @@ export const ChatInterface = () => {
     currentConversation,
     loading 
   } = useChat();
-  const { generateBotResponse, newsContext, lastUpdated } = useBotResponses();
+  const { generateBotResponse, newsContext, lastUpdated, getCacheStats } = useBotResponses();
   const { 
     messages, 
     addMessage, 
@@ -27,6 +27,9 @@ export const ChatInterface = () => {
     pendingMessages 
   } = useChatMessages();
   const [inputValue, setInputValue] = useState('');
+
+  // Get cache stats for display
+  const cacheStats = getCacheStats();
 
   // Initialize with enhanced welcome message that includes news context
   useEffect(() => {
@@ -111,6 +114,12 @@ export const ChatInterface = () => {
         <Badge variant="outline" className="border-green-400 text-green-400">
           10 Funcții
         </Badge>
+        {cacheStats.hitRate > 0 && (
+          <Badge variant="outline" className="border-purple-400 text-purple-400">
+            <Zap className="w-3 h-3 mr-1" />
+            Cache: {cacheStats.hitRate.toFixed(0)}%
+          </Badge>
+        )}
         {lastUpdated && (
           <Badge variant="outline" className="border-cyan-400 text-cyan-400 ml-auto">
             <Newspaper className="w-3 h-3 mr-1" />
