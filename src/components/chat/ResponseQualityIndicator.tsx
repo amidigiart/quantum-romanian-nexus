@@ -100,7 +100,7 @@ export const ResponseQualityIndicator: React.FC<ResponseQualityIndicatorProps> =
           <div className={`text-sm font-medium ${getQualityColor(metrics.userSatisfactionPrediction)}`}>
             {Math.round(metrics.userSatisfactionPrediction * 100)}%
           </div>
-          <Progress value={metrics.userSatisfactionP prediction * 100} className="h-1" />
+          <Progress value={metrics.userSatisfactionPrediction * 100} className="h-1" />
         </div>
       </div>
 
