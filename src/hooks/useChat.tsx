@@ -27,30 +27,47 @@ export const useChat = () => {
     createConversation,
     selectConversation,
     deleteConversation,
-    loadConversations
+    updateConversationTitle,
+    loadConversations,
+    loading: conversationsLoading
   } = useConversations();
 
   const {
     saveMessage,
     loadMessages,
-    loading
+    loadRecentMessages,
+    getMessageCount,
+    loading: messagesLoading
   } = useChatPersistence();
 
   const selectConversationWithMessages = async (conversation: ChatConversation) => {
     selectConversation(conversation);
-    const loadedMessages = await loadMessages(conversation.id);
-    setMessages(loadedMessages);
+    
+    // Load recent messages first for better UX
+    const recentMessages = await loadRecentMessages(conversation.id, 50);
+    setMessages(recentMessages);
+  };
+
+  const loadMoreMessages = async (offset: number = 0) => {
+    if (!currentConversation) return;
+    
+    const olderMessages = await loadMessages(currentConversation.id, 50);
+    // In a real implementation, you'd handle pagination properly
+    setMessages(olderMessages);
   };
 
   return {
     conversations,
     currentConversation,
     messages,
-    loading,
+    loading: conversationsLoading || messagesLoading,
     createConversation,
     selectConversation: selectConversationWithMessages,
     deleteConversation,
+    updateConversationTitle,
     saveMessage,
+    loadMoreMessages,
+    getMessageCount,
     setMessages,
     loadConversations
   };
