@@ -1,8 +1,9 @@
-
 import { useState, useCallback } from 'react';
 import { ChatMessage } from '@/hooks/useChat';
 import { useStreamingResponse } from './useStreamingResponse';
 import { useUnifiedMessageProcessor } from './useUnifiedMessageProcessor';
+import { useDebouncedInput } from './useDebouncedInput';
+import { debouncedCallback } from '@/utils/debounce';
 
 interface UseOptimizedChatHandlersProps {
   user: any;
@@ -25,8 +26,6 @@ export const useOptimizedChatHandlers = ({
   selectedProvider,
   selectedModel
 }: UseOptimizedChatHandlersProps) => {
-  const [inputValue, setInputValue] = useState('');
-
   const {
     streamingMessage,
     isStreaming,
@@ -60,39 +59,68 @@ export const useOptimizedChatHandlers = ({
     onStreamError: cancelStreaming
   });
 
+  // Use debounced input instead of plain state
+  const { inputValue, handleInputChange, isTyping } = useDebouncedInput({
+    onTypingStart: () => console.log('User started typing'),
+    onTypingStop: () => console.log('User stopped typing'),
+    typingDelay: 1500,
+    changeDelay: 200
+  });
+
+  // Create debounced send message function
+  const { execute: debouncedSendMessage, cancel: cancelDebouncedSend } = debouncedCallback(
+    async (messageText: string) => {
+      await processMessage(messageText);
+    },
+    300 // 300ms debounce for send message
+  );
+
   const sendMessage = useCallback(async () => {
     if (!inputValue.trim() || !user || isGenerating || isStreaming) return;
 
     const messageText = inputValue;
-    setInputValue('');
+    handleInputChange(''); // Clear input immediately
 
-    await processMessage(messageText);
-  }, [inputValue, user, isGenerating, isStreaming, processMessage]);
+    // Use debounced send to prevent rapid firing
+    await debouncedSendMessage(messageText);
+  }, [inputValue, user, isGenerating, isStreaming, handleInputChange, debouncedSendMessage]);
 
   const handleQuickAction = useCallback((action: string) => {
+    // Cancel any pending debounced sends
+    cancelDebouncedSend();
+    
     // Cancel any pending request for the previous input
     if (inputValue.trim() && user) {
       cancelMessage(inputValue);
     }
     
-    setInputValue(action);
-    setTimeout(() => sendMessage(), 100);
-  }, [inputValue, user, sendMessage, cancelMessage]);
+    handleInputChange(action);
+    
+    // Use a longer delay for quick actions to prevent accidental double-sends
+    setTimeout(() => {
+      if (action.trim() && user && !isGenerating && !isStreaming) {
+        debouncedSendMessage(action);
+      }
+    }, 200);
+  }, [inputValue, user, isGenerating, isStreaming, handleInputChange, cancelMessage, debouncedSendMessage, cancelDebouncedSend]);
 
   const cancelCurrentRequest = useCallback(() => {
+    cancelDebouncedSend();
+    
     if (inputValue.trim() && user) {
       cancelMessage(inputValue);
       cancelStreaming();
     }
-  }, [inputValue, user, cancelMessage, cancelStreaming]);
+  }, [inputValue, user, cancelMessage, cancelStreaming, cancelDebouncedSend]);
 
   return {
     inputValue,
-    setInputValue,
+    setInputValue: handleInputChange,
     sendMessage,
     handleQuickAction,
     streamingMessage,
     isStreaming,
+    isTyping,
     cancelCurrentRequest,
     getPendingRequestsCount: getPendingCount
   };

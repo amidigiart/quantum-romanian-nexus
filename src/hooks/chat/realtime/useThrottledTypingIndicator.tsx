@@ -1,9 +1,11 @@
 
 import { useCallback, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { debounce } from '@/utils/debounce';
 
 interface TypingIndicatorConfig {
   throttleDelay: number;
+  debounceDelay?: number;
 }
 
 export const useThrottledTypingIndicator = (
@@ -12,53 +14,59 @@ export const useThrottledTypingIndicator = (
 ) => {
   const { user } = useAuth();
   const lastTypingIndicatorRef = useRef<number>(0);
-  const typingIndicatorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isCurrentlyTypingRef = useRef(false);
+
+  // Debounced function to send typing start
+  const debouncedSendTypingStart = useCallback(
+    debounce(() => {
+      const now = Date.now();
+      if (now - lastTypingIndicatorRef.current >= config.throttleDelay) {
+        sendMessage('typing', { 
+          isTyping: true, 
+          userId: user?.id 
+        });
+        lastTypingIndicatorRef.current = now;
+        isCurrentlyTypingRef.current = true;
+        console.log('Sent typing start indicator (debounced & throttled)');
+      }
+    }, config.debounceDelay || 200),
+    [config.throttleDelay, config.debounceDelay, user?.id, sendMessage]
+  );
+
+  // Debounced function to send typing stop
+  const debouncedSendTypingStop = useCallback(
+    debounce(() => {
+      if (isCurrentlyTypingRef.current) {
+        sendMessage('typing', { 
+          isTyping: false, 
+          userId: user?.id 
+        });
+        isCurrentlyTypingRef.current = false;
+        console.log('Sent typing stop indicator (debounced)');
+      }
+    }, 100), // Shorter debounce for stop
+    [user?.id, sendMessage]
+  );
 
   const sendTypingIndicator = useCallback((isTyping: boolean) => {
-    const now = Date.now();
-    
-    // Clear any pending timeout
-    if (typingIndicatorTimeoutRef.current) {
-      clearTimeout(typingIndicatorTimeoutRef.current);
-      typingIndicatorTimeoutRef.current = null;
-    }
-
     if (isTyping) {
-      // Throttle typing start indicators
-      if (now - lastTypingIndicatorRef.current < config.throttleDelay) {
-        // Schedule for later if within throttle window
-        typingIndicatorTimeoutRef.current = setTimeout(() => {
-          sendTypingIndicatorImmediate(true);
-        }, config.throttleDelay - (now - lastTypingIndicatorRef.current));
-        return;
-      }
-    }
-
-    // Send immediately for stop typing or if throttle period has passed
-    sendTypingIndicatorImmediate(isTyping);
-  }, [config.throttleDelay, user?.id]);
-
-  const sendTypingIndicatorImmediate = useCallback((isTyping: boolean) => {
-    sendMessage('typing', { 
-      isTyping, 
-      userId: user?.id 
-    });
-    
-    if (isTyping) {
-      lastTypingIndicatorRef.current = Date.now();
-      console.log('Sent typing indicator (throttled)');
+      debouncedSendTypingStart();
     } else {
-      console.log('Sent stop typing indicator');
+      debouncedSendTypingStop();
+    }
+  }, [debouncedSendTypingStart, debouncedSendTypingStop]);
+
+  // Cleanup function
+  const cleanup = useCallback(() => {
+    // Send final stop typing if currently typing
+    if (isCurrentlyTypingRef.current) {
+      sendMessage('typing', { 
+        isTyping: false, 
+        userId: user?.id 
+      });
+      isCurrentlyTypingRef.current = false;
     }
   }, [sendMessage, user?.id]);
-
-  // Cleanup on unmount
-  const cleanup = useCallback(() => {
-    if (typingIndicatorTimeoutRef.current) {
-      clearTimeout(typingIndicatorTimeoutRef.current);
-      typingIndicatorTimeoutRef.current = null;
-    }
-  }, []);
 
   return {
     sendTypingIndicator,
