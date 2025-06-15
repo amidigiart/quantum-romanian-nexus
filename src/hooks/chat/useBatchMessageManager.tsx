@@ -1,74 +1,89 @@
 
-import { useCallback, useRef, useEffect } from 'react';
-import { useOptimizedChatPersistence } from './useOptimizedChatPersistence';
+import { useCallback } from 'react';
 import { ChatMessage } from '@/hooks/useChat';
+import { useBatchOperations } from './persistence/useBatchOperations';
 
 export const useBatchMessageManager = () => {
-  const { queueMessage, flushQueue, queueSize } = useOptimizedChatPersistence();
-  const flushTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Auto-flush queue when component unmounts or page unloads
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      flushQueue();
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden' && queueSize > 0) {
-        flushQueue();
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      if (flushTimeoutRef.current) {
-        clearTimeout(flushTimeoutRef.current);
-      }
-      // Flush any remaining messages
-      if (queueSize > 0) {
-        flushQueue();
-      }
-    };
-  }, [flushQueue, queueSize]);
+  const { 
+    addOperation, 
+    flushBatch, 
+    clearBatch, 
+    isProcessing, 
+    stats, 
+    queueSize 
+  } = useBatchOperations({
+    maxBatchSize: 20,
+    flushIntervalMs: 1500,
+    priorityThresholds: {
+      high: 3,
+      normal: 10,
+      low: 20
+    }
+  });
 
   const saveBatchedMessage = useCallback((
     message: ChatMessage,
     conversationId: string,
     options: {
-      priority?: 'high' | 'normal';
+      priority?: 'high' | 'normal' | 'low';
       onSuccess?: () => void;
       onError?: (error: any) => void;
     } = {}
   ) => {
     const { priority = 'normal', onSuccess, onError } = options;
 
-    queueMessage(message, conversationId, onSuccess, onError);
+    addOperation('message', message, {
+      conversationId,
+      priority,
+      onSuccess,
+      onError
+    });
 
-    // For high priority messages, flush immediately
-    if (priority === 'high') {
-      if (flushTimeoutRef.current) {
-        clearTimeout(flushTimeoutRef.current);
-        flushTimeoutRef.current = null;
-      }
-      flushQueue();
-    }
-  }, [queueMessage, flushQueue]);
+    console.log(`Message queued for batch save: ${message.text.substring(0, 50)}...`);
+  }, [addOperation]);
+
+  const updateConversationBatch = useCallback((
+    conversationId: string,
+    updates: any,
+    options: {
+      priority?: 'high' | 'normal' | 'low';
+      onSuccess?: () => void;
+      onError?: (error: any) => void;
+    } = {}
+  ) => {
+    addOperation('conversation_update', updates, {
+      conversationId,
+      ...options
+    });
+  }, [addOperation]);
+
+  const updatePreferencesBatch = useCallback((
+    preferences: any,
+    options: {
+      priority?: 'high' | 'normal' | 'low';
+      onSuccess?: () => void;
+      onError?: (error: any) => void;
+    } = {}
+  ) => {
+    addOperation('user_preference', preferences, options);
+  }, [addOperation]);
 
   const forceFlush = useCallback(() => {
-    if (flushTimeoutRef.current) {
-      clearTimeout(flushTimeoutRef.current);
-      flushTimeoutRef.current = null;
-    }
-    return flushQueue();
-  }, [flushQueue]);
+    return flushBatch();
+  }, [flushBatch]);
+
+  const clearQueue = useCallback(() => {
+    clearBatch();
+  }, [clearBatch]);
 
   return {
     saveBatchedMessage,
+    updateConversationBatch,
+    updatePreferencesBatch,
     forceFlush,
+    clearQueue,
+    isProcessing,
+    stats,
     queueSize
   };
 };
