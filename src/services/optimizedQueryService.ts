@@ -93,7 +93,7 @@ export class OptimizedQueryService {
       .lt('updated_at', cutoffDate.toISOString());
 
     if (error) throw error;
-    return data?.length || 0;
+    return (data || []).length;
   }
 
   // Get messages with quantum data efficiently

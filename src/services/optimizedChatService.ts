@@ -85,7 +85,7 @@ export class OptimizedChatService {
         .lt('updated_at', cutoffDate.toISOString());
 
       if (error) throw error;
-      return data?.length || 0;
+      return (data || []).length;
     } catch (error) {
       console.error('Error in conversation cleanup:', error);
       throw error;
