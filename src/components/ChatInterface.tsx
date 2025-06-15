@@ -66,26 +66,34 @@ export const ChatInterface = () => {
       (error) => updateMessageOnError(userMessage.id, 'Failed to send message')
     );
 
-    // Generate and add bot response with optimistic update
+    // Generate and add bot response using edge function
     setTimeout(async () => {
-      const botMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        text: generateBotResponse(inputValue),
-        isBot: true,
-        timestamp: new Date()
-      };
-      
-      // Optimistically add bot message to UI
-      addMessage(botMessage, true);
-      
-      // Save bot message to database in background
-      saveMessage(
-        botMessage, 
-        currentConversation?.id,
-        () => markMessageAsSaved(botMessage.id),
-        (error) => updateMessageOnError(botMessage.id, 'Failed to save response')
-      );
-    }, 1000);
+      try {
+        const botResponseText = await generateBotResponse(inputValue, currentConversation?.id);
+        
+        const botMessage: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          text: botResponseText,
+          isBot: true,
+          timestamp: new Date()
+        };
+        
+        // Optimistically add bot message to UI
+        addMessage(botMessage, true);
+        
+        // Mark as saved since edge function handles database saving
+        markMessageAsSaved(botMessage.id);
+      } catch (error) {
+        console.error('Error generating bot response:', error);
+        const errorMessage: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          text: 'Ne pare rău, am întâmpinat o problemă tehnică. Vă rugăm să încercați din nou.',
+          isBot: true,
+          timestamp: new Date()
+        };
+        addMessage(errorMessage, false);
+      }
+    }, 500);
   };
 
   const handleQuickAction = (action: string) => {
@@ -113,6 +121,10 @@ export const ChatInterface = () => {
         <h2 className="text-2xl font-bold text-white">Asistent Cuantic Hibrid</h2>
         <Badge variant="outline" className="border-green-400 text-green-400">
           10 Funcții
+        </Badge>
+        <Badge variant="outline" className="border-purple-400 text-purple-400">
+          <Zap className="w-3 h-3 mr-1" />
+          Edge Powered
         </Badge>
         {cacheStats.hitRate > 0 && (
           <Badge variant="outline" className="border-purple-400 text-purple-400">
