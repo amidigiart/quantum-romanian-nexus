@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { VirtualizedMessageList } from '@/components/chat/VirtualizedMessageList';
@@ -8,9 +9,11 @@ import { TypingHandler } from '@/components/chat/TypingHandler';
 import { ChatHeader } from '@/components/chat/ChatHeader';
 import { EnhancedModeToggle } from '@/components/chat/EnhancedModeToggle';
 import { LoadingState } from '@/components/chat/LoadingState';
+import { ResponseQualityIndicator } from '@/components/chat/ResponseQualityIndicator';
 import { useChatHandlers } from '@/components/chat/useChatHandlers';
 import { AIProviderSelector, AI_PROVIDERS } from '@/components/chat/AIProviderSelector';
 import { useMultiProviderBotResponses } from '@/hooks/chat/useMultiProviderBotResponses';
+import { useEnhancedBotResponses } from '@/hooks/chat/useEnhancedBotResponses';
 
 export const ChatInterface = () => {
   const {
@@ -35,7 +38,10 @@ export const ChatInterface = () => {
 
   const [selectedProvider, setSelectedProvider] = useState('openai');
   const [selectedModel, setSelectedModel] = useState('gpt-4.1-2025-04-14');
+  const [showQualityMetrics, setShowQualityMetrics] = useState(false);
+  
   const { generateResponseWithProvider, isGenerating } = useMultiProviderBotResponses();
+  const { conversationContext, responseMetrics } = useEnhancedBotResponses();
 
   if (loading) {
     return <LoadingState />;
@@ -60,9 +66,24 @@ export const ChatInterface = () => {
         disabled={!user || isGenerating}
       />
 
-      <EnhancedModeToggle 
-        useEnhancedMode={useEnhancedMode}
-        onChange={setUseEnhancedMode}
+      <div className="flex items-center justify-between mb-4">
+        <EnhancedModeToggle 
+          useEnhancedMode={useEnhancedMode}
+          onChange={setUseEnhancedMode}
+        />
+        
+        <button
+          onClick={() => setShowQualityMetrics(!showQualityMetrics)}
+          className="text-xs text-gray-400 hover:text-white transition-colors"
+        >
+          {showQualityMetrics ? 'Hide' : 'Show'} Analytics
+        </button>
+      </div>
+
+      <ResponseQualityIndicator
+        metrics={responseMetrics}
+        context={conversationContext}
+        isVisible={showQualityMetrics && useEnhancedMode}
       />
 
       <PresenceIndicator 
