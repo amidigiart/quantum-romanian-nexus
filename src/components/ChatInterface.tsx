@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Bot, Atom, Newspaper, Zap } from 'lucide-react';
+import { Bot, Atom, Newspaper, Zap, Sparkles } from 'lucide-react';
 import { useChat, ChatMessage } from '@/hooks/useChat';
 import { useAuth } from '@/hooks/useAuth';
 import { useBotResponses } from '@/hooks/chat/useBotResponses';
@@ -32,6 +31,7 @@ export const ChatInterface = () => {
     pendingMessages 
   } = useChatMessages();
   const [inputValue, setInputValue] = useState('');
+  const [useEnhancedMode, setUseEnhancedMode] = useState(false);
 
   // Analytics integration
   const { 
@@ -64,13 +64,13 @@ export const ChatInterface = () => {
     if (!currentConversation && messages.length === 0 && user) {
       const welcomeMessage: ChatMessage = {
         id: '1',
-        text: `Bună ziua! Sunt asistentul dvs. cuantic avansat cu acces la ultimele știri din domeniu. Pot să vă ajut cu 10 funcții cuantice hibride: algoritmi Grover/Shor, criptografie cuantică, învățare automată cuantică, optimizare QAOA, simulare VQE, și multe altele.\n\n${newsContext ? `📰 ${newsContext}` : ''}\n\nCu ce vă pot ajuta?`,
+        text: `Bună ziua! Sunt asistentul dvs. cuantic avansat cu acces la ultimele știri din domeniu${useEnhancedMode ? ' și funcții AI îmbunătățite' : ''}. Pot să vă ajut cu 10 funcții cuantice hibride: algoritmi Grover/Shor, criptografie cuantică, învățare automată cuantică, optimizare QAOA, simulare VQE, și multe altele.\n\n${newsContext ? `📰 ${newsContext}` : ''}\n\n${useEnhancedMode ? '🧠 Mod AI avansat: răspunsuri contextuale și personalizate active.\n\n' : ''}Cu ce vă pot ajuta?`,
         isBot: true,
         timestamp: new Date()
       };
       initializeWithWelcome(welcomeMessage);
     }
-  }, [currentConversation, user, messages.length, newsContext]);
+  }, [currentConversation, user, messages.length, newsContext, useEnhancedMode]);
 
   // Handle presence status changes
   useEffect(() => {
@@ -89,7 +89,8 @@ export const ChatInterface = () => {
     // Track user action
     trackUserAction('message_sent', {
       message_length: inputValue.length,
-      has_conversation: !!currentConversation
+      has_conversation: !!currentConversation,
+      enhanced_mode: useEnhancedMode
     });
 
     const userMessage: ChatMessage = {
@@ -130,7 +131,8 @@ export const ChatInterface = () => {
         // Track performance
         trackPerformance('bot_response_generation', botResponseTime, {
           input_length: inputValue.length,
-          response_length: botResponseText.length
+          response_length: botResponseText.length,
+          enhanced_mode: useEnhancedMode
         });
 
         // Track cache operation based on response time (heuristic)
@@ -156,7 +158,8 @@ export const ChatInterface = () => {
         // Track successful bot response
         trackEvent('bot_response_received', {
           response_time: botResponseTime,
-          message_id: botMessage.id
+          message_id: botMessage.id,
+          enhanced_mode: useEnhancedMode
         });
       } catch (error) {
         console.error('Error generating bot response:', error);
@@ -164,7 +167,8 @@ export const ChatInterface = () => {
         // Track error
         trackEvent('bot_response_error', {
           error: error instanceof Error ? error.message : 'Unknown error',
-          input: inputValue.substring(0, 50) // Truncate for privacy
+          input: inputValue.substring(0, 50),
+          enhanced_mode: useEnhancedMode
         });
         
         const errorMessage: ChatMessage = {
@@ -186,7 +190,8 @@ export const ChatInterface = () => {
     // Track quick action usage
     trackUserAction('quick_action_used', {
       action,
-      action_length: action.length
+      action_length: action.length,
+      enhanced_mode: useEnhancedMode
     });
     
     setInputValue(action);
@@ -221,6 +226,12 @@ export const ChatInterface = () => {
           <Zap className="w-3 h-3 mr-1" />
           Edge Powered
         </Badge>
+        {useEnhancedMode && (
+          <Badge variant="outline" className="border-cyan-400 text-cyan-400">
+            <Sparkles className="w-3 h-3 mr-1" />
+            AI Enhanced
+          </Badge>
+        )}
         {cacheStats.hitRate > 0 && (
           <Badge variant="outline" className="border-purple-400 text-purple-400">
             <Zap className="w-3 h-3 mr-1" />
@@ -233,6 +244,18 @@ export const ChatInterface = () => {
             Știri: {lastUpdated.toLocaleTimeString('ro-RO')}
           </Badge>
         )}
+      </div>
+
+      <div className="flex items-center gap-2 mb-4">
+        <label className="flex items-center gap-2 text-sm text-gray-300">
+          <input 
+            type="checkbox" 
+            checked={useEnhancedMode}
+            onChange={(e) => setUseEnhancedMode(e.target.checked)}
+            className="rounded"
+          />
+          Activează AI Avansat
+        </label>
       </div>
 
       {/* Real-time presence indicator */}
@@ -256,12 +279,16 @@ export const ChatInterface = () => {
         onChange={setInputValue}
         onSend={sendMessage}
         disabled={!user}
-        placeholder="Întrebați despre quantum computing, ultimele știri, senzori IoT..."
+        placeholder={useEnhancedMode ? 
+          "Întrebați cu AI avansat despre quantum computing..." : 
+          "Întrebați despre quantum computing, ultimele știri, senzori IoT..."
+        }
       />
 
       <QuickActions 
         onActionClick={handleQuickAction}
         disabled={!user}
+        enhanced={useEnhancedMode}
       />
     </Card>
   );
