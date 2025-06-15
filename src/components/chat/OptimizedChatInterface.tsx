@@ -68,7 +68,7 @@ export const OptimizedChatInterface = React.memo(() => {
   return (
     <div className="space-y-4">
       <Card className="bg-white/10 backdrop-blur-lg border-white/20 p-6 quantum-glow">
-        <WelcomeMessage />
+        <WelcomeMessage isEnhanced={true} />
 
         <LazyAIProviderSelector
           selectedProvider={selectedProvider}

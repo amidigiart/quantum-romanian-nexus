@@ -7,6 +7,13 @@ import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const OptimizedIndex = () => {
+  // Mock quantum metrics for the status component
+  const mockQuantumMetrics = {
+    activeQubits: 127,
+    coherence: 87,
+    entanglement: 92
+  };
+
   return (
     <div className="min-h-screen p-4">
       <div className="max-w-7xl mx-auto">
@@ -27,7 +34,7 @@ const OptimizedIndex = () => {
           {/* Sidebar with status and news */}
           <div className="space-y-6">
             <Suspense fallback={<Skeleton className="h-32 w-full bg-white/20" />}>
-              <QuantumStatus />
+              <QuantumStatus metrics={mockQuantumMetrics} />
             </Suspense>
             
             <Suspense fallback={<Skeleton className="h-96 w-full bg-white/20" />}>

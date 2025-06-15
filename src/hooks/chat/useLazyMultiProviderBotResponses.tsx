@@ -19,11 +19,7 @@ export const useLazyMultiProviderBotResponses = () => {
     setIsGenerating(true);
     
     try {
-      // Lazy load the multi-provider hook only when needed
-      const { useMultiProviderBotResponses } = await import('./useMultiProviderBotResponses');
-      
-      // This is a simplified version - in practice you'd want to implement the core logic here
-      // without importing the full hook to avoid circular dependencies
+      // Simulate API call - in practice this would call your backend
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -22,5 +22,5 @@ export const loadPresenceIndicator = () => import('./PresenceIndicator');
 // Provider utilities (tree-shakable)
 export * from './providers';
 
-// Types (no runtime cost)
-export type { AIProvider, AIProviderConfig } from './AIProviderSelector';
+// Types (no runtime cost) - import from the lazy hook instead
+export type { AIProviderConfig } from '../hooks/chat/useLazyMultiProviderBotResponses';
