@@ -26,6 +26,32 @@ export class RealtimeService {
     this.callbacks = callbacks;
   }
 
+  // Helper method to extract UserPresence from Supabase presence state
+  private extractPresences(presenceState: any): UserPresence[] {
+    const presences: UserPresence[] = [];
+    
+    Object.keys(presenceState).forEach(key => {
+      const presenceList = presenceState[key];
+      if (Array.isArray(presenceList)) {
+        presenceList.forEach((presence: any) => {
+          // Extract the actual UserPresence data from the presence object
+          if (presence && typeof presence === 'object') {
+            const userPresence: UserPresence = {
+              user_id: presence.user_id || key,
+              username: presence.username,
+              avatar_url: presence.avatar_url,
+              online_at: presence.online_at || new Date().toISOString(),
+              status: presence.status || 'online'
+            };
+            presences.push(userPresence);
+          }
+        });
+      }
+    });
+    
+    return presences;
+  }
+
   // Subscribe to real-time chat messages for a conversation
   subscribeToConversation(conversationId: string) {
     const channelName = `conversation:${conversationId}`;
@@ -93,20 +119,20 @@ export class RealtimeService {
       .channel(channelName)
       .on('presence', { event: 'sync' }, () => {
         const presenceState = channel.presenceState();
-        const presences = Object.values(presenceState).flat() as UserPresence[];
+        const presences = this.extractPresences(presenceState);
         console.log('Presence sync:', presences);
         this.callbacks.onUserPresenceChange?.(presences);
       })
       .on('presence', { event: 'join' }, ({ newPresences }) => {
         console.log('User joined:', newPresences);
         const presenceState = channel.presenceState();
-        const allPresences = Object.values(presenceState).flat() as UserPresence[];
+        const allPresences = this.extractPresences(presenceState);
         this.callbacks.onUserPresenceChange?.(allPresences);
       })
       .on('presence', { event: 'leave' }, ({ leftPresences }) => {
         console.log('User left:', leftPresences);
         const presenceState = channel.presenceState();
-        const allPresences = Object.values(presenceState).flat() as UserPresence[];
+        const allPresences = this.extractPresences(presenceState);
         this.callbacks.onUserPresenceChange?.(allPresences);
       })
       .subscribe(async (status) => {
