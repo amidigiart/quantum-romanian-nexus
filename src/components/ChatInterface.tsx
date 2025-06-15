@@ -6,7 +6,7 @@ import { useChat, ChatMessage } from '@/hooks/useChat';
 import { useAuth } from '@/hooks/useAuth';
 import { useBotResponses } from '@/hooks/chat/useBotResponses';
 import { useChatMessages } from '@/hooks/chat/useChatMessages';
-import { MessageList } from '@/components/chat/MessageList';
+import { VirtualizedMessageList } from '@/components/chat/VirtualizedMessageList';
 import { MessageInput } from '@/components/chat/MessageInput';
 import { QuickActions } from '@/components/chat/QuickActions';
 
@@ -128,7 +128,7 @@ export const ChatInterface = () => {
         )}
       </div>
       
-      <MessageList messages={messages} pendingMessages={pendingMessages} />
+      <VirtualizedMessageList messages={messages} pendingMessages={pendingMessages} />
 
       <MessageInput
         value={inputValue}
