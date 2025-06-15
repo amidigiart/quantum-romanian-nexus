@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -19,7 +18,14 @@ export const ChatInterface = () => {
     loading 
   } = useChat();
   const { generateBotResponse, newsContext, lastUpdated } = useBotResponses();
-  const { messages, addMessage, initializeWithWelcome } = useChatMessages();
+  const { 
+    messages, 
+    addMessage, 
+    initializeWithWelcome, 
+    markMessageAsSaved, 
+    updateMessageOnError,
+    pendingMessages 
+  } = useChatMessages();
   const [inputValue, setInputValue] = useState('');
 
   // Initialize with enhanced welcome message that includes news context
@@ -45,12 +51,19 @@ export const ChatInterface = () => {
       timestamp: new Date()
     };
 
-    // Add user message to UI and save to database
-    addMessage(userMessage);
-    await saveMessage(userMessage, currentConversation?.id);
+    // Optimistically add user message to UI
+    addMessage(userMessage, true);
     setInputValue('');
 
-    // Simulate bot response delay
+    // Save message to database in background
+    saveMessage(
+      userMessage, 
+      currentConversation?.id,
+      () => markMessageAsSaved(userMessage.id),
+      (error) => updateMessageOnError(userMessage.id, 'Failed to send message')
+    );
+
+    // Generate and add bot response with optimistic update
     setTimeout(async () => {
       const botMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -59,9 +72,16 @@ export const ChatInterface = () => {
         timestamp: new Date()
       };
       
-      // Add bot message to UI and save to database
-      addMessage(botMessage);
-      await saveMessage(botMessage, currentConversation?.id);
+      // Optimistically add bot message to UI
+      addMessage(botMessage, true);
+      
+      // Save bot message to database in background
+      saveMessage(
+        botMessage, 
+        currentConversation?.id,
+        () => markMessageAsSaved(botMessage.id),
+        (error) => updateMessageOnError(botMessage.id, 'Failed to save response')
+      );
     }, 1000);
   };
 
@@ -99,7 +119,7 @@ export const ChatInterface = () => {
         )}
       </div>
       
-      <MessageList messages={messages} />
+      <MessageList messages={messages} pendingMessages={pendingMessages} />
 
       <MessageInput
         value={inputValue}

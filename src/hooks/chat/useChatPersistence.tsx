@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -10,8 +9,16 @@ export const useChatPersistence = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
 
-  const saveMessage = async (message: ChatMessage, conversationId?: string) => {
-    if (!user) return;
+  const saveMessage = async (
+    message: ChatMessage, 
+    conversationId?: string,
+    onSuccess?: () => void,
+    onError?: (error: any) => void
+  ) => {
+    if (!user) {
+      onError?.(new Error('User not authenticated'));
+      return;
+    }
 
     try {
       const { error } = await supabase
@@ -33,13 +40,11 @@ export const useChatPersistence = () => {
           .update({ updated_at: new Date().toISOString() })
           .eq('id', conversationId);
       }
+
+      onSuccess?.();
     } catch (error) {
       console.error('Error saving message:', error);
-      toast({
-        title: "Eroare",
-        description: "Nu s-a putut salva mesajul",
-        variant: "destructive",
-      });
+      onError?.(error);
     }
   };
 
