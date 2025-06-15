@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Zap, Brain, Atom, Search, BarChart3, Flask } from 'lucide-react';
+import { Zap, Brain, Atom, Search, BarChart3, Beaker } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 interface QuickActionsProps {
@@ -44,7 +44,7 @@ export const QuickActions = ({ onActionClick, disabled = false, enhanced = false
     },
     { 
       key: 'quick.vqe_chemistry', 
-      icon: Flask, 
+      icon: Beaker, 
       variant: 'secondary' as const 
     }
   ];
