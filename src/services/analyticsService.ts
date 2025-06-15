@@ -181,7 +181,7 @@ export class AnalyticsService {
 
   getPerformanceMetrics(): PerformanceMetrics {
     const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
-    const loadTime = navigation ? navigation.loadEventEnd - navigation.navigationStart : 0;
+    const loadTime = navigation ? navigation.loadEventEnd - navigation.fetchStart : 0;
     
     const errorEvents = this.events.filter(e => e.event_type === 'error');
     const cacheEvents = this.events.filter(e => e.event_type === 'cache_operation');

@@ -12,7 +12,7 @@ interface UseAnalyticsOptions {
 
 export const useAnalytics = (options: UseAnalyticsOptions = {}) => {
   const { user } = useAuth();
-  const componentRef = useRef<HTMLElement>(null);
+  const componentRef = useRef<HTMLDivElement>(null);
   const {
     trackClicks = true,
     trackPageViews = true,
