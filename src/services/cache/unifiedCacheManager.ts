@@ -2,6 +2,7 @@
 import { MemoryCacheManager } from './memoryCacheManager';
 import { SessionCacheManager } from './sessionCacheManager';
 import { responseCacheService } from '../responseCacheService';
+import { advancedCacheWarmingService } from './advancedCacheWarmingService';
 import { CacheMetrics, CacheWarmingStrategy } from '@/types/cache';
 
 export interface UnifiedCacheConfig {
@@ -17,8 +18,6 @@ export class UnifiedCacheManager {
   private memoryCache: MemoryCacheManager;
   private sessionCache: SessionCacheManager;
   private config: Required<UnifiedCacheConfig>;
-  private warmingQueue: Map<string, CacheWarmingStrategy> = new Map();
-  private isWarming = false;
 
   constructor(config: UnifiedCacheConfig = {}) {
     this.config = {
@@ -35,6 +34,11 @@ export class UnifiedCacheManager {
 
     // Start periodic cleanup
     this.startPeriodicMaintenance();
+
+    // Initialize warming service if enabled
+    if (this.config.enableWarming) {
+      advancedCacheWarmingService.startPeriodicWarming();
+    }
   }
 
   // Hierarchical cache retrieval: Memory → Session → Response Cache
@@ -116,7 +120,7 @@ export class UnifiedCacheManager {
 
       // Schedule for warming if it's a high-priority item
       if (priority === 'high' && this.config.enableWarming) {
-        this.scheduleForWarming(key, tags, priority);
+        advancedCacheWarmingService.scheduleForWarming(key, tags, priority);
       }
     } catch (error) {
       console.error('Unified cache storage error:', error);
@@ -137,36 +141,19 @@ export class UnifiedCacheManager {
     await Promise.allSettled(promises);
   }
 
-  // Advanced cache warming with queue management
+  // Delegate warming operations to the warming service
   async warmCache(strategies: CacheWarmingStrategy[]): Promise<void> {
     if (!this.config.enableWarming) {
       console.log('Cache warming is disabled');
       return;
     }
 
-    // Add strategies to warming queue
-    strategies.forEach(strategy => {
-      this.warmingQueue.set(strategy.key, strategy);
-    });
-
-    if (!this.isWarming) {
-      await this.processWarmingQueue();
-    }
+    return advancedCacheWarmingService.warmCache(strategies);
   }
 
   // Prefetch related data based on patterns
   async prefetch(baseKey: string, patterns: string[]): Promise<void> {
-    const prefetchPromises = patterns.map(async (pattern) => {
-      const prefetchKey = `${baseKey}:${pattern}`;
-      const existing = await this.get(prefetchKey);
-      
-      if (!existing) {
-        // Schedule for warming with lower priority
-        this.scheduleForWarming(prefetchKey, ['prefetch'], 'low');
-      }
-    });
-
-    await Promise.allSettled(prefetchPromises);
+    return advancedCacheWarmingService.prefetchRelatedContent(baseKey, patterns);
   }
 
   // Invalidation with cascade through hierarchy
@@ -190,9 +177,11 @@ export class UnifiedCacheManager {
     memoryStats: { size: number; hitRate: number };
     sessionStats: { size: number; hitRate: number };
     responseCacheStats: any;
+    warmingStatus: { size: number; isWarming: boolean };
   } {
     const baseMetrics = this.calculateUnifiedMetrics();
     const responseCacheStats = responseCacheService.getCacheStats();
+    const warmingStatus = advancedCacheWarmingService.getQueueStatus();
 
     return {
       ...baseMetrics,
@@ -204,7 +193,8 @@ export class UnifiedCacheManager {
         size: this.sessionCache.size(),
         hitRate: this.cacheStats.session.hitRate
       },
-      responseCacheStats
+      responseCacheStats,
+      warmingStatus
     };
   }
 
@@ -213,7 +203,7 @@ export class UnifiedCacheManager {
     this.memoryCache.clear();
     this.sessionCache.clear();
     responseCacheService.clearCache();
-    this.warmingQueue.clear();
+    advancedCacheWarmingService.clearWarmingQueue();
     this.resetStats();
     console.log('All cache layers cleared');
   }
@@ -246,45 +236,6 @@ export class UnifiedCacheManager {
         }
       }
     });
-  }
-
-  private async processWarmingQueue(): Promise<void> {
-    if (this.isWarming || this.warmingQueue.size === 0) return;
-
-    this.isWarming = true;
-    console.log(`Processing ${this.warmingQueue.size} cache warming strategies...`);
-
-    const warmingPromises = Array.from(this.warmingQueue.values()).map(async (strategy) => {
-      try {
-        const data = await strategy.dataLoader();
-        await this.set(
-          strategy.key,
-          data,
-          strategy.ttl,
-          strategy.tags,
-          strategy.priority || 'medium'
-        );
-        console.log(`Cache warmed: ${strategy.key}`);
-      } catch (error) {
-        console.error(`Failed to warm cache for ${strategy.key}:`, error);
-      }
-    });
-
-    await Promise.allSettled(warmingPromises);
-    this.warmingQueue.clear();
-    this.isWarming = false;
-    console.log('Cache warming completed');
-  }
-
-  private scheduleForWarming(key: string, tags: string[], priority: 'low' | 'medium' | 'high'): void {
-    if (!this.warmingQueue.has(key)) {
-      this.warmingQueue.set(key, {
-        key,
-        dataLoader: async () => null, // Placeholder - actual warming strategies should provide this
-        tags,
-        priority
-      });
-    }
   }
 
   private calculateUnifiedMetrics(): CacheMetrics {
@@ -331,6 +282,7 @@ export class UnifiedCacheManager {
   // Cleanup method for when service is destroyed
   destroy(): void {
     this.clearAll();
+    advancedCacheWarmingService.destroy();
     console.log('Unified cache manager destroyed');
   }
 }
