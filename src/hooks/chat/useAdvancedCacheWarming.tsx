@@ -1,16 +1,16 @@
 
-import { optimizedCacheWarmingService } from '@/services/cache/optimizedCacheWarmingService';
+import { advancedCacheWarmingService } from '@/services/cache/advancedCacheWarmingService';
 import { cacheHitOptimizer } from '@/services/cache/cacheHitOptimizer';
 
 export const useAdvancedCacheWarming = () => {
   const warmAdvancedCache = async () => {
     console.log('Starting advanced cache warming with optimizations...');
     
-    // Use the optimized warming service
-    await optimizedCacheWarmingService.warmFrequentPatterns();
+    // Use the advanced warming service
+    await advancedCacheWarmingService.warmFrequentPatterns();
     
-    // Schedule periodic warming
-    optimizedCacheWarmingService.schedulePeriodicWarming();
+    // Start periodic warming
+    advancedCacheWarmingService.startPeriodicWarming();
     
     console.log('Advanced cache warming completed');
   };

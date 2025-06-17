@@ -1,9 +1,9 @@
-
 import { MemoryCacheManager } from './memoryCacheManager';
 import { SessionCacheManager } from './sessionCacheManager';
 import { responseCacheService } from '../responseCacheService';
 import { advancedCacheWarmingService } from './advancedCacheWarmingService';
 import { CacheMetrics, CacheWarmingStrategy } from '@/types/cache';
+import { CacheMetricsCalculator, CacheStats } from './cacheMetricsCalculator';
 
 export interface UnifiedCacheConfig {
   memoryMaxSize?: number;
@@ -18,6 +18,7 @@ export class UnifiedCacheManager {
   private memoryCache: MemoryCacheManager;
   private sessionCache: SessionCacheManager;
   private config: Required<UnifiedCacheConfig>;
+  private cacheStats: CacheStats;
 
   constructor(config: UnifiedCacheConfig = {}) {
     this.config = {
@@ -31,6 +32,7 @@ export class UnifiedCacheManager {
 
     this.memoryCache = new MemoryCacheManager(this.config.memoryMaxSize, this.config.memoryTtl);
     this.sessionCache = new SessionCacheManager(this.config.sessionMaxSize, this.config.sessionTtl);
+    this.cacheStats = CacheMetricsCalculator.createEmptyStats();
 
     // Start periodic cleanup
     this.startPeriodicMaintenance();
@@ -172,30 +174,23 @@ export class UnifiedCacheManager {
     return totalInvalidated;
   }
 
-  // Get comprehensive metrics across all cache layers
+  // Get comprehensive metrics across all cache layers using the metrics calculator
   getMetrics(): CacheMetrics & {
     memoryStats: { size: number; hitRate: number };
     sessionStats: { size: number; hitRate: number };
     responseCacheStats: any;
     warmingStatus: { size: number; isWarming: boolean };
   } {
-    const baseMetrics = this.calculateUnifiedMetrics();
     const responseCacheStats = responseCacheService.getCacheStats();
     const warmingStatus = advancedCacheWarmingService.getQueueStatus();
 
-    return {
-      ...baseMetrics,
-      memoryStats: {
-        size: this.memoryCache.size(),
-        hitRate: this.cacheStats.memory.hitRate
-      },
-      sessionStats: {
-        size: this.sessionCache.size(),
-        hitRate: this.cacheStats.session.hitRate
-      },
+    return CacheMetricsCalculator.calculateExtendedMetrics(
+      this.memoryCache,
+      this.sessionCache,
+      this.cacheStats,
       responseCacheStats,
       warmingStatus
-    };
+    );
   }
 
   // Clear all cache layers
@@ -209,58 +204,14 @@ export class UnifiedCacheManager {
   }
 
   // Private methods for internal management
-  private cacheStats = {
-    memory: { hits: 0, misses: 0, hitRate: 0 },
-    session: { hits: 0, misses: 0, hitRate: 0 },
-    response: { hits: 0, misses: 0, hitRate: 0 },
-    totalMisses: 0
-  };
-
   private recordCacheHit(layer: 'memory' | 'session' | 'response', responseTime: number): void {
     this.cacheStats[layer].hits++;
-    this.updateHitRates();
+    CacheMetricsCalculator.updateHitRates(this.cacheStats);
   }
 
   private recordCacheMiss(): void {
     this.cacheStats.totalMisses++;
-    this.updateHitRates();
-  }
-
-  private updateHitRates(): void {
-    Object.keys(this.cacheStats).forEach(key => {
-      if (key !== 'totalMisses') {
-        const stats = this.cacheStats[key as keyof typeof this.cacheStats];
-        if (typeof stats === 'object' && 'hits' in stats && 'misses' in stats) {
-          const total = stats.hits + stats.misses;
-          stats.hitRate = total > 0 ? (stats.hits / total) * 100 : 0;
-        }
-      }
-    });
-  }
-
-  private calculateUnifiedMetrics(): CacheMetrics {
-    const totalHits = this.cacheStats.memory.hits + this.cacheStats.session.hits + this.cacheStats.response.hits;
-    const totalRequests = totalHits + this.cacheStats.totalMisses;
-    
-    return {
-      totalSize: this.memoryCache.size() + this.sessionCache.size(),
-      hitRate: totalRequests > 0 ? (totalHits / totalRequests) * 100 : 0,
-      missRate: totalRequests > 0 ? (this.cacheStats.totalMisses / totalRequests) * 100 : 0,
-      averageResponseTime: 0, // Would need to track this separately
-      popularQueries: [],
-      cacheEfficiency: this.calculateEfficiency()
-    };
-  }
-
-  private calculateEfficiency(): number {
-    const memorySize = this.memoryCache.size();
-    const sessionSize = this.sessionCache.size();
-    const totalSize = memorySize + sessionSize;
-    
-    if (totalSize === 0) return 0;
-    
-    // Efficiency based on memory cache utilization (faster access)
-    return (memorySize / totalSize) * 100;
+    CacheMetricsCalculator.updateHitRates(this.cacheStats);
   }
 
   private startPeriodicMaintenance(): void {
@@ -271,12 +222,7 @@ export class UnifiedCacheManager {
   }
 
   private resetStats(): void {
-    this.cacheStats = {
-      memory: { hits: 0, misses: 0, hitRate: 0 },
-      session: { hits: 0, misses: 0, hitRate: 0 },
-      response: { hits: 0, misses: 0, hitRate: 0 },
-      totalMisses: 0
-    };
+    this.cacheStats = CacheMetricsCalculator.createEmptyStats();
   }
 
   // Cleanup method for when service is destroyed
