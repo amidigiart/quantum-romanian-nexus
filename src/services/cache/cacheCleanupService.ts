@@ -6,8 +6,8 @@ export class CacheCleanupService {
   private cleanupInterval?: NodeJS.Timeout;
 
   startPeriodicCleanup(memoryCache: MemoryCacheManager, sessionCache: SessionCacheManager): void {
-    this.cleanupInterval = setInterval(() => {
-      this.cleanupExpiredEntries(memoryCache, sessionCache);
+    this.cleanupInterval = setInterval(async () => {
+      await this.cleanupExpiredEntries(memoryCache, sessionCache);
     }, 60000); // Clean up every minute
   }
 
@@ -18,9 +18,9 @@ export class CacheCleanupService {
     }
   }
 
-  cleanupExpiredEntries(memoryCache: MemoryCacheManager, sessionCache: SessionCacheManager): void {
-    const memoryCleanedCount = memoryCache.cleanupExpired();
-    const sessionCleanedCount = sessionCache.cleanupExpired();
+  async cleanupExpiredEntries(memoryCache: MemoryCacheManager, sessionCache: SessionCacheManager): Promise<void> {
+    const memoryCleanedCount = await memoryCache.cleanupExpired();
+    const sessionCleanedCount = await sessionCache.cleanupExpired();
     const totalCleaned = memoryCleanedCount + sessionCleanedCount;
 
     if (totalCleaned > 0) {
@@ -28,13 +28,13 @@ export class CacheCleanupService {
     }
   }
 
-  invalidateByTags(
+  async invalidateByTags(
     tags: string[], 
     memoryCache: MemoryCacheManager, 
     sessionCache: SessionCacheManager
-  ): void {
+  ): Promise<void> {
     const memoryInvalidated = memoryCache.invalidateByTags(tags);
-    const sessionInvalidated = sessionCache.invalidateByTags(tags);
+    const sessionInvalidated = await sessionCache.invalidateByTags(tags);
     const totalInvalidated = memoryInvalidated + sessionInvalidated;
 
     console.log(`Invalidated ${totalInvalidated} cache entries with tags:`, tags);

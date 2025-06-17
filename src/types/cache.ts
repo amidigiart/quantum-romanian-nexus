@@ -22,10 +22,24 @@ export interface CacheMetrics {
   popularQueries: { query: string; hits: number }[];
   cacheEfficiency: number;
   compressionStats?: {
-    totalCompressed: number;
-    totalUncompressed: number;
-    compressionRatio: number;
-    spaceSaved: number;
+    memory?: {
+      totalCompressed: number;
+      totalUncompressed: number;
+      compressionRatio: number;
+      spaceSaved: number;
+    };
+    session?: {
+      totalCompressed: number;
+      totalUncompressed: number;
+      compressionRatio: number;
+      spaceSaved: number;
+    };
+    combined?: {
+      totalCompressed: number;
+      totalUncompressed: number;
+      compressionRatio: number;
+      spaceSaved: number;
+    };
   };
 }
 

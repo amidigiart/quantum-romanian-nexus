@@ -119,8 +119,8 @@ export class UnifiedCacheManager {
   }
 
   // Invalidation with cascade through hierarchy
-  invalidateByTags(tags: string[]): number {
-    return this.invalidationService.invalidateByTags(tags);
+  async invalidateByTags(tags: string[]): Promise<number> {
+    return await this.invalidationService.invalidateByTags(tags);
   }
 
   // Get comprehensive metrics across all cache layers using the metrics calculator
@@ -129,7 +129,6 @@ export class UnifiedCacheManager {
     sessionStats: { size: number; hitRate: number };
     responseCacheStats: any;
     warmingStatus: { size: number; isWarming: boolean };
-    compressionStats?: any;
   } {
     const responseCacheStats = responseCacheService.getCacheStats();
     const warmingStatus = advancedCacheWarmingService.getQueueStatus();
@@ -148,7 +147,11 @@ export class UnifiedCacheManager {
 
     return {
       ...baseMetrics,
-      compressionStats
+      compressionStats: {
+        memory: compressionStats.memory,
+        session: compressionStats.session,
+        combined: compressionStats.combined
+      }
     };
   }
 

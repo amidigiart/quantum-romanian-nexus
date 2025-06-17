@@ -9,9 +9,9 @@ export class CacheInvalidationService {
     private sessionCache: SessionCacheManager
   ) {}
 
-  invalidateByTags(tags: string[]): number {
+  async invalidateByTags(tags: string[]): Promise<number> {
     const memoryInvalidated = this.memoryCache.invalidateByTags(tags);
-    const sessionInvalidated = this.sessionCache.invalidateByTags(tags);
+    const sessionInvalidated = await this.sessionCache.invalidateByTags(tags);
     
     // Also clear from response cache if it's a chat response
     if (tags.includes('chat-response')) {
