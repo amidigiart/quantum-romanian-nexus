@@ -1,21 +1,23 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useOptimizedChatPersistence } from './useOptimizedChatPersistence';
 import { useToast } from '@/hooks/use-toast';
+import { garbageCollectionService } from '@/services/cache/garbageCollectionService';
 
 interface MemoryConfig {
   maxMessagesInMemory: number;
   maxConversationsInMemory: number;
   cleanupThresholdDays: number;
   virtualizationBufferSize: number;
+  gcThresholdMB: number;
 }
 
 const DEFAULT_MEMORY_CONFIG: MemoryConfig = {
   maxMessagesInMemory: 200,
   maxConversationsInMemory: 50,
   cleanupThresholdDays: 30,
-  virtualizationBufferSize: 10
+  virtualizationBufferSize: 10,
+  gcThresholdMB: 100
 };
 
 export const useMemoryManagement = (config: Partial<MemoryConfig> = {}) => {
@@ -28,21 +30,25 @@ export const useMemoryManagement = (config: Partial<MemoryConfig> = {}) => {
     messagesInMemory: 0,
     conversationsInMemory: 0,
     lastCleanup: null as Date | null,
-    totalMemoryMB: 0
+    totalMemoryMB: 0,
+    gcMetrics: garbageCollectionService.getGCMetrics(),
+    systemMemory: garbageCollectionService.getMemoryStats()
   });
 
-  // Monitor memory usage
+  // Monitor memory usage with GC integration
   const updateMemoryUsage = useCallback(() => {
-    if (typeof window !== 'undefined' && 'performance' in window && 'memory' in (window.performance as any)) {
-      const memory = (window.performance as any).memory;
-      setMemoryUsage(prev => ({
-        ...prev,
-        totalMemoryMB: Math.round(memory.usedJSHeapSize / (1024 * 1024))
-      }));
-    }
+    const systemMemory = garbageCollectionService.getMemoryStats();
+    const gcMetrics = garbageCollectionService.getGCMetrics();
+    
+    setMemoryUsage(prev => ({
+      ...prev,
+      totalMemoryMB: systemMemory.used,
+      gcMetrics,
+      systemMemory
+    }));
   }, []);
 
-  // Cleanup old conversations based on threshold
+  // Enhanced cleanup with GC trigger
   const performCleanup = useCallback(async (forceCleanup = false) => {
     if (!user) return 0;
 
@@ -54,6 +60,9 @@ export const useMemoryManagement = (config: Partial<MemoryConfig> = {}) => {
       if (forceCleanup || daysSinceLastCleanup >= memoryConfig.cleanupThresholdDays) {
         const deletedCount = await cleanupOldData(memoryConfig.cleanupThresholdDays);
         
+        // Trigger GC after cleanup
+        garbageCollectionService.forceGarbageCollection('cleanup');
+        
         setMemoryUsage(prev => ({
           ...prev,
           lastCleanup: new Date(),
@@ -63,7 +72,7 @@ export const useMemoryManagement = (config: Partial<MemoryConfig> = {}) => {
         if (deletedCount > 0) {
           toast({
             title: "Cleanup Complete",
-            description: `Cleaned up ${deletedCount} old conversations to optimize memory usage.`,
+            description: `Cleaned up ${deletedCount} old conversations and freed memory.`,
           });
         }
 
@@ -102,21 +111,38 @@ export const useMemoryManagement = (config: Partial<MemoryConfig> = {}) => {
     };
   }, [memoryConfig.virtualizationBufferSize]);
 
-  // Memory pressure detection and automatic cleanup
+  // Enhanced memory pressure detection with GC integration
   const checkMemoryPressure = useCallback(() => {
-    const isHighMemoryUsage = memoryUsage.totalMemoryMB > 100; // 100MB threshold
+    const systemMemory = garbageCollectionService.getMemoryStats();
+    const isHighMemoryUsage = systemMemory.used > memoryConfig.gcThresholdMB;
     const isTooManyMessages = memoryUsage.messagesInMemory > memoryConfig.maxMessagesInMemory;
     const isTooManyConversations = memoryUsage.conversationsInMemory > memoryConfig.maxConversationsInMemory;
 
     if (isHighMemoryUsage || isTooManyMessages || isTooManyConversations) {
+      console.log('Memory pressure detected, performing cleanup and GC');
       performCleanup(true);
-      
-      // Force garbage collection if available (development only)
-      if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined' && 'gc' in window) {
-        (window as any).gc();
-      }
+      garbageCollectionService.forceGarbageCollection('pressure');
     }
   }, [memoryUsage, memoryConfig, performCleanup]);
+
+  // Force garbage collection manually
+  const forceGarbageCollection = useCallback(() => {
+    const success = garbageCollectionService.forceGarbageCollection('manual');
+    if (success) {
+      updateMemoryUsage();
+      toast({
+        title: "Memory Optimized",
+        description: "Garbage collection completed successfully.",
+      });
+    } else {
+      toast({
+        title: "Optimization Failed",
+        description: "Unable to perform garbage collection.",
+        variant: "destructive",
+      });
+    }
+    return success;
+  }, [updateMemoryUsage, toast]);
 
   // Track message and conversation counts
   const updateMessageCount = useCallback((count: number) => {
@@ -127,7 +153,7 @@ export const useMemoryManagement = (config: Partial<MemoryConfig> = {}) => {
     setMemoryUsage(prev => ({ ...prev, conversationsInMemory: count }));
   }, []);
 
-  // Periodic memory monitoring
+  // Enhanced periodic monitoring with GC
   useEffect(() => {
     const interval = setInterval(() => {
       updateMemoryUsage();
@@ -152,6 +178,8 @@ export const useMemoryManagement = (config: Partial<MemoryConfig> = {}) => {
     updateMessageCount,
     updateConversationCount,
     checkMemoryPressure,
-    isMemoryOptimized: memoryUsage.totalMemoryMB < 50 && memoryUsage.messagesInMemory < memoryConfig.maxMessagesInMemory
+    forceGarbageCollection,
+    isMemoryOptimized: memoryUsage.systemMemory.usagePercent < 50 && 
+                      memoryUsage.messagesInMemory < memoryConfig.maxMessagesInMemory
   };
 };

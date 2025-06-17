@@ -9,6 +9,7 @@ import { CacheHierarchyService } from './cacheHierarchyService';
 import { CacheInvalidationService } from './cacheInvalidationService';
 import { CacheMaintenanceService } from './cacheMaintenanceService';
 import { CachePolicyManager } from './policies/cachePolicyManager';
+import { garbageCollectionService } from './garbageCollectionService';
 
 export type { UnifiedCacheConfig } from './unifiedCacheConfig';
 
@@ -62,6 +63,12 @@ export class UnifiedCacheManager {
     if (this.config.enableWarming) {
       advancedCacheWarmingService.startPeriodicWarming();
     }
+
+    // Configure GC service based on cache config
+    garbageCollectionService.updateConfig({
+      memoryThresholdMB: this.config.memoryMaxSize * 2, // Trigger GC at 2x cache size
+      enableAutoGC: true
+    });
   }
 
   // Hierarchical cache retrieval: Memory → Session → Response Cache
@@ -69,7 +76,7 @@ export class UnifiedCacheManager {
     return this.hierarchyService.get<T>(key, tags);
   }
 
-  // Enhanced intelligent cache storage with policy-driven decisions
+  // Enhanced intelligent cache storage with policy-driven decisions and GC integration
   async set<T>(
     key: string, 
     data: T, 
@@ -77,8 +84,17 @@ export class UnifiedCacheManager {
     tags: string[] = [],
     priority: 'low' | 'medium' | 'high' = 'medium'
   ): Promise<void> {
+    // Check memory pressure before storing large items
+    const dataSize = JSON.stringify(data).length;
+    if (dataSize > 50000) { // 50KB threshold
+      const memoryStats = garbageCollectionService.getMemoryStats();
+      if (memoryStats.usagePercent > 80) {
+        garbageCollectionService.forceGarbageCollection('pressure');
+      }
+    }
+
     // Use policy manager to determine storage layer and TTL
-    const targetLayer = this.policyManager.determineStorageLayer(priority, JSON.stringify(data).length);
+    const targetLayer = this.policyManager.determineStorageLayer(priority, dataSize);
     const calculatedTtl = ttl || this.policyManager.calculateTTL(priority, targetLayer);
 
     await this.hierarchyService.set(key, data, calculatedTtl, tags, priority);
@@ -118,9 +134,16 @@ export class UnifiedCacheManager {
     return advancedCacheWarmingService.prefetchRelatedContent(baseKey, patterns);
   }
 
-  // Invalidation with cascade through hierarchy
+  // Enhanced invalidation with GC trigger
   async invalidateByTags(tags: string[]): Promise<number> {
-    return await this.invalidationService.invalidateByTags(tags);
+    const invalidatedCount = await this.invalidationService.invalidateByTags(tags);
+    
+    // Trigger GC if we invalidated many entries
+    if (invalidatedCount > 50) {
+      garbageCollectionService.forceGarbageCollection('cleanup');
+    }
+    
+    return invalidatedCount;
   }
 
   // Get comprehensive metrics across all cache layers using the metrics calculator
@@ -129,10 +152,14 @@ export class UnifiedCacheManager {
     sessionStats: { size: number; hitRate: number };
     responseCacheStats: any;
     warmingStatus: { size: number; isWarming: boolean };
+    gcMetrics: any;
+    systemMemory: any;
   } {
     const responseCacheStats = responseCacheService.getCacheStats();
     const warmingStatus = advancedCacheWarmingService.getQueueStatus();
     const compressionStats = this.hierarchyService.getCompressionStats();
+    const gcMetrics = garbageCollectionService.getGCMetrics();
+    const systemMemory = garbageCollectionService.getMemoryStats();
 
     // Update hit rates before calculating metrics
     CacheMetricsCalculator.updateHitRates(this.cacheStats);
@@ -151,8 +178,20 @@ export class UnifiedCacheManager {
         memory: compressionStats.memory,
         session: compressionStats.session,
         combined: compressionStats.combined
-      }
+      },
+      gcMetrics,
+      systemMemory
     };
+  }
+
+  // Force garbage collection manually
+  forceGarbageCollection(): boolean {
+    return garbageCollectionService.forceGarbageCollection('manual');
+  }
+
+  // Get maintenance statistics
+  getMaintenanceStats() {
+    return this.maintenanceService.getMaintenanceStats();
   }
 
   // Clear all cache layers
@@ -185,6 +224,7 @@ export class UnifiedCacheManager {
   destroy(): void {
     this.clearAll();
     this.maintenanceService.stopPeriodicMaintenance();
+    garbageCollectionService.destroy();
     advancedCacheWarmingService.destroy();
     console.log('Unified cache manager destroyed');
   }
