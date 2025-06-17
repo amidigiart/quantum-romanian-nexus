@@ -3,13 +3,15 @@ import { MemoryCacheManager } from './memoryCacheManager';
 import { SessionCacheManager } from './sessionCacheManager';
 import { responseCacheService } from '../responseCacheService';
 import { CacheStats } from './cacheMetricsCalculator';
+import { CachePolicyManager } from './policies/cachePolicyManager';
 
 export class CacheHierarchyService {
   constructor(
     private memoryCache: MemoryCacheManager,
     private sessionCache: SessionCacheManager,
     private config: { enableHierarchy: boolean; memoryTtl: number; sessionTtl: number },
-    private cacheStats: CacheStats
+    private cacheStats: CacheStats,
+    private policyManager?: CachePolicyManager
   ) {}
 
   async get<T>(key: string, tags: string[] = []): Promise<T | null> {
@@ -70,15 +72,18 @@ export class CacheHierarchyService {
     tags: string[] = [],
     priority: 'low' | 'medium' | 'high' = 'medium'
   ): Promise<void> {
-    const sessionTtl = ttl || this.config.sessionTtl;
-    const memoryTtl = Math.min(sessionTtl, this.config.memoryTtl);
-
     try {
+      // Use policy manager to determine optimal storage strategy
+      const targetLayer = this.policyManager?.determineStorageLayer(priority, JSON.stringify(data).length) || 'session';
+      
+      const sessionTtl = this.policyManager?.calculateTTL(priority, 'session') || ttl || this.config.sessionTtl;
+      const memoryTtl = this.policyManager?.calculateTTL(priority, 'memory') || Math.min(sessionTtl, this.config.memoryTtl);
+
       // Always store in session cache
       this.sessionCache.set(key, data, sessionTtl, tags, priority);
 
-      // Store in memory cache based on priority and hierarchy setting
-      if (this.config.enableHierarchy && (priority === 'high' || priority === 'medium')) {
+      // Store in memory cache based on policy decision
+      if (this.config.enableHierarchy && (targetLayer === 'memory' || priority === 'high')) {
         this.memoryCache.set(key, data, memoryTtl, tags, priority);
       }
 

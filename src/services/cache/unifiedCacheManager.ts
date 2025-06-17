@@ -1,4 +1,3 @@
-
 import { MemoryCacheManager } from './memoryCacheManager';
 import { SessionCacheManager } from './sessionCacheManager';
 import { responseCacheService } from '../responseCacheService';
@@ -9,6 +8,7 @@ import { UnifiedCacheConfig, DEFAULT_CACHE_CONFIG } from './unifiedCacheConfig';
 import { CacheHierarchyService } from './cacheHierarchyService';
 import { CacheInvalidationService } from './cacheInvalidationService';
 import { CacheMaintenanceService } from './cacheMaintenanceService';
+import { CachePolicyManager } from './policies/cachePolicyManager';
 
 export type { UnifiedCacheConfig } from './unifiedCacheConfig';
 
@@ -20,15 +20,19 @@ export class UnifiedCacheManager {
   private hierarchyService: CacheHierarchyService;
   private invalidationService: CacheInvalidationService;
   private maintenanceService: CacheMaintenanceService;
+  private policyManager: CachePolicyManager;
 
   constructor(config: UnifiedCacheConfig = {}) {
     this.config = { ...DEFAULT_CACHE_CONFIG, ...config };
+
+    // Initialize policy manager first
+    this.policyManager = new CachePolicyManager(this.config.policies);
 
     this.memoryCache = new MemoryCacheManager(this.config.memoryMaxSize, this.config.memoryTtl);
     this.sessionCache = new SessionCacheManager(this.config.sessionMaxSize, this.config.sessionTtl);
     this.cacheStats = CacheMetricsCalculator.createEmptyStats();
 
-    // Initialize services
+    // Initialize services with policy manager
     this.hierarchyService = new CacheHierarchyService(
       this.memoryCache,
       this.sessionCache,
@@ -37,7 +41,8 @@ export class UnifiedCacheManager {
         memoryTtl: this.config.memoryTtl,
         sessionTtl: this.config.sessionTtl
       },
-      this.cacheStats
+      this.cacheStats,
+      this.policyManager
     );
 
     this.invalidationService = new CacheInvalidationService(
@@ -64,7 +69,7 @@ export class UnifiedCacheManager {
     return this.hierarchyService.get<T>(key, tags);
   }
 
-  // Intelligent cache storage with automatic hierarchy placement
+  // Enhanced intelligent cache storage with policy-driven decisions
   async set<T>(
     key: string, 
     data: T, 
@@ -72,7 +77,11 @@ export class UnifiedCacheManager {
     tags: string[] = [],
     priority: 'low' | 'medium' | 'high' = 'medium'
   ): Promise<void> {
-    await this.hierarchyService.set(key, data, ttl, tags, priority);
+    // Use policy manager to determine storage layer and TTL
+    const targetLayer = this.policyManager.determineStorageLayer(priority, JSON.stringify(data).length);
+    const calculatedTtl = ttl || this.policyManager.calculateTTL(priority, targetLayer);
+
+    await this.hierarchyService.set(key, data, calculatedTtl, tags, priority);
 
     // Schedule for warming if it's a high-priority item
     if (priority === 'high' && this.config.enableWarming) {
@@ -148,6 +157,20 @@ export class UnifiedCacheManager {
     this.cacheStats = CacheMetricsCalculator.createEmptyStats();
   }
 
+  // Policy management methods
+  updateCachePolicies(policies: Partial<import('@/types/cachePolicy').CachePolicyConfig>): void {
+    this.policyManager.updateConfig(policies);
+    console.log('Cache policies updated:', this.policyManager.getCurrentStrategies());
+  }
+
+  getCachePolicies() {
+    return this.policyManager.getConfig();
+  }
+
+  getCurrentStrategies() {
+    return this.policyManager.getCurrentStrategies();
+  }
+
   // Cleanup method for when service is destroyed
   destroy(): void {
     this.clearAll();
@@ -157,7 +180,7 @@ export class UnifiedCacheManager {
   }
 }
 
-// Export singleton instance
+// Export singleton instance with default policies
 export const unifiedCacheManager = new UnifiedCacheManager({
   enableHierarchy: true,
   enableWarming: true
