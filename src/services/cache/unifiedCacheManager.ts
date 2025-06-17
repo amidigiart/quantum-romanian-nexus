@@ -4,38 +4,53 @@ import { responseCacheService } from '../responseCacheService';
 import { advancedCacheWarmingService } from './advancedCacheWarmingService';
 import { CacheMetrics, CacheWarmingStrategy } from '@/types/cache';
 import { CacheMetricsCalculator, CacheStats } from './cacheMetricsCalculator';
+import { UnifiedCacheConfig, DEFAULT_CACHE_CONFIG } from './unifiedCacheConfig';
+import { CacheHierarchyService } from './cacheHierarchyService';
+import { CacheInvalidationService } from './cacheInvalidationService';
+import { CacheMaintenanceService } from './cacheMaintenanceService';
 
-export interface UnifiedCacheConfig {
-  memoryMaxSize?: number;
-  sessionMaxSize?: number;
-  memoryTtl?: number;
-  sessionTtl?: number;
-  enableHierarchy?: boolean;
-  enableWarming?: boolean;
-}
+export { UnifiedCacheConfig } from './unifiedCacheConfig';
 
 export class UnifiedCacheManager {
   private memoryCache: MemoryCacheManager;
   private sessionCache: SessionCacheManager;
   private config: Required<UnifiedCacheConfig>;
   private cacheStats: CacheStats;
+  private hierarchyService: CacheHierarchyService;
+  private invalidationService: CacheInvalidationService;
+  private maintenanceService: CacheMaintenanceService;
 
   constructor(config: UnifiedCacheConfig = {}) {
-    this.config = {
-      memoryMaxSize: config.memoryMaxSize ?? 50,
-      sessionMaxSize: config.sessionMaxSize ?? 200,
-      memoryTtl: config.memoryTtl ?? 2 * 60 * 1000,
-      sessionTtl: config.sessionTtl ?? 5 * 60 * 1000,
-      enableHierarchy: config.enableHierarchy ?? true,
-      enableWarming: config.enableWarming ?? true
-    };
+    this.config = { ...DEFAULT_CACHE_CONFIG, ...config };
 
     this.memoryCache = new MemoryCacheManager(this.config.memoryMaxSize, this.config.memoryTtl);
     this.sessionCache = new SessionCacheManager(this.config.sessionMaxSize, this.config.sessionTtl);
     this.cacheStats = CacheMetricsCalculator.createEmptyStats();
 
-    // Start periodic cleanup
-    this.startPeriodicMaintenance();
+    // Initialize services
+    this.hierarchyService = new CacheHierarchyService(
+      this.memoryCache,
+      this.sessionCache,
+      {
+        enableHierarchy: this.config.enableHierarchy,
+        memoryTtl: this.config.memoryTtl,
+        sessionTtl: this.config.sessionTtl
+      },
+      this.cacheStats
+    );
+
+    this.invalidationService = new CacheInvalidationService(
+      this.memoryCache,
+      this.sessionCache
+    );
+
+    this.maintenanceService = new CacheMaintenanceService(
+      this.memoryCache,
+      this.sessionCache
+    );
+
+    // Start services
+    this.maintenanceService.startPeriodicMaintenance();
 
     // Initialize warming service if enabled
     if (this.config.enableWarming) {
@@ -45,54 +60,7 @@ export class UnifiedCacheManager {
 
   // Hierarchical cache retrieval: Memory → Session → Response Cache
   async get<T>(key: string, tags: string[] = []): Promise<T | null> {
-    const startTime = performance.now();
-
-    try {
-      // Level 1: Memory Cache (fastest)
-      const memoryResult = this.memoryCache.get<T>(key);
-      if (memoryResult !== null) {
-        this.recordCacheHit('memory', performance.now() - startTime);
-        return memoryResult;
-      }
-
-      // Level 2: Session Cache
-      const sessionResult = this.sessionCache.get<T>(key);
-      if (sessionResult !== null) {
-        // Promote to memory cache if hierarchy is enabled
-        if (this.config.enableHierarchy) {
-          this.memoryCache.set(key, sessionResult, this.config.memoryTtl, tags, 'medium');
-        }
-        this.recordCacheHit('session', performance.now() - startTime);
-        return sessionResult;
-      }
-
-      // Level 3: Response Cache (for chat responses)
-      if (tags.includes('chat-response')) {
-        const responseResult = responseCacheService.getCachedResponse(key);
-        if (responseResult) {
-          try {
-            const parsedResult = JSON.parse(responseResult) as T;
-            
-            // Promote through hierarchy
-            if (this.config.enableHierarchy) {
-              this.sessionCache.set(key, parsedResult, this.config.sessionTtl, tags, 'low');
-            }
-            
-            this.recordCacheHit('response', performance.now() - startTime);
-            return parsedResult;
-          } catch (error) {
-            console.warn('Failed to parse cached response:', error);
-          }
-        }
-      }
-
-      this.recordCacheMiss();
-      return null;
-    } catch (error) {
-      console.error('Unified cache retrieval error:', error);
-      this.recordCacheMiss();
-      return null;
-    }
+    return this.hierarchyService.get<T>(key, tags);
   }
 
   // Intelligent cache storage with automatic hierarchy placement
@@ -103,29 +71,11 @@ export class UnifiedCacheManager {
     tags: string[] = [],
     priority: 'low' | 'medium' | 'high' = 'medium'
   ): Promise<void> {
-    const sessionTtl = ttl || this.config.sessionTtl;
-    const memoryTtl = Math.min(sessionTtl, this.config.memoryTtl);
+    await this.hierarchyService.set(key, data, ttl, tags, priority);
 
-    try {
-      // Always store in session cache
-      this.sessionCache.set(key, data, sessionTtl, tags, priority);
-
-      // Store in memory cache based on priority and hierarchy setting
-      if (this.config.enableHierarchy && (priority === 'high' || priority === 'medium')) {
-        this.memoryCache.set(key, data, memoryTtl, tags, priority);
-      }
-
-      // Store chat responses in response cache service
-      if (tags.includes('chat-response') && typeof data === 'string') {
-        responseCacheService.setCachedResponse(key, data);
-      }
-
-      // Schedule for warming if it's a high-priority item
-      if (priority === 'high' && this.config.enableWarming) {
-        advancedCacheWarmingService.scheduleForWarming(key, tags, priority);
-      }
-    } catch (error) {
-      console.error('Unified cache storage error:', error);
+    // Schedule for warming if it's a high-priority item
+    if (priority === 'high' && this.config.enableWarming) {
+      advancedCacheWarmingService.scheduleForWarming(key, tags, priority);
     }
   }
 
@@ -160,18 +110,7 @@ export class UnifiedCacheManager {
 
   // Invalidation with cascade through hierarchy
   invalidateByTags(tags: string[]): number {
-    const memoryInvalidated = this.memoryCache.invalidateByTags(tags);
-    const sessionInvalidated = this.sessionCache.invalidateByTags(tags);
-    
-    // Also clear from response cache if it's a chat response
-    if (tags.includes('chat-response')) {
-      responseCacheService.clearCache();
-    }
-
-    const totalInvalidated = memoryInvalidated + sessionInvalidated;
-    console.log(`Invalidated ${totalInvalidated} cache entries with tags:`, tags);
-    
-    return totalInvalidated;
+    return this.invalidationService.invalidateByTags(tags);
   }
 
   // Get comprehensive metrics across all cache layers using the metrics calculator
@@ -184,6 +123,9 @@ export class UnifiedCacheManager {
     const responseCacheStats = responseCacheService.getCacheStats();
     const warmingStatus = advancedCacheWarmingService.getQueueStatus();
 
+    // Update hit rates before calculating metrics
+    CacheMetricsCalculator.updateHitRates(this.cacheStats);
+
     return CacheMetricsCalculator.calculateExtendedMetrics(
       this.memoryCache,
       this.sessionCache,
@@ -195,32 +137,12 @@ export class UnifiedCacheManager {
 
   // Clear all cache layers
   clearAll(): void {
-    this.memoryCache.clear();
-    this.sessionCache.clear();
-    responseCacheService.clearCache();
+    this.invalidationService.clearAll();
     advancedCacheWarmingService.clearWarmingQueue();
     this.resetStats();
-    console.log('All cache layers cleared');
   }
 
   // Private methods for internal management
-  private recordCacheHit(layer: 'memory' | 'session' | 'response', responseTime: number): void {
-    this.cacheStats[layer].hits++;
-    CacheMetricsCalculator.updateHitRates(this.cacheStats);
-  }
-
-  private recordCacheMiss(): void {
-    this.cacheStats.totalMisses++;
-    CacheMetricsCalculator.updateHitRates(this.cacheStats);
-  }
-
-  private startPeriodicMaintenance(): void {
-    setInterval(() => {
-      this.memoryCache.cleanupExpired();
-      this.sessionCache.cleanupExpired();
-    }, 60000); // Every minute
-  }
-
   private resetStats(): void {
     this.cacheStats = CacheMetricsCalculator.createEmptyStats();
   }
@@ -228,6 +150,7 @@ export class UnifiedCacheManager {
   // Cleanup method for when service is destroyed
   destroy(): void {
     this.clearAll();
+    this.maintenanceService.stopPeriodicMaintenance();
     advancedCacheWarmingService.destroy();
     console.log('Unified cache manager destroyed');
   }
