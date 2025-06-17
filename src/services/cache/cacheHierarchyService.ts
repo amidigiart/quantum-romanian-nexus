@@ -19,18 +19,18 @@ export class CacheHierarchyService {
 
     try {
       // Level 1: Memory Cache (fastest)
-      const memoryResult = this.memoryCache.get<T>(key);
+      const memoryResult = await this.memoryCache.get<T>(key);
       if (memoryResult !== null) {
         this.recordCacheHit('memory', performance.now() - startTime);
         return memoryResult;
       }
 
       // Level 2: Session Cache
-      const sessionResult = this.sessionCache.get<T>(key);
+      const sessionResult = await this.sessionCache.get<T>(key);
       if (sessionResult !== null) {
         // Promote to memory cache if hierarchy is enabled
         if (this.config.enableHierarchy) {
-          this.memoryCache.set(key, sessionResult, this.config.memoryTtl, tags, 'medium');
+          await this.memoryCache.set(key, sessionResult, this.config.memoryTtl, tags, 'medium');
         }
         this.recordCacheHit('session', performance.now() - startTime);
         return sessionResult;
@@ -45,7 +45,7 @@ export class CacheHierarchyService {
             
             // Promote through hierarchy
             if (this.config.enableHierarchy) {
-              this.sessionCache.set(key, parsedResult, this.config.sessionTtl, tags, 'low');
+              await this.sessionCache.set(key, parsedResult, this.config.sessionTtl, tags, 'low');
             }
             
             this.recordCacheHit('response', performance.now() - startTime);
@@ -80,11 +80,11 @@ export class CacheHierarchyService {
       const memoryTtl = this.policyManager?.calculateTTL(priority, 'memory') || Math.min(sessionTtl, this.config.memoryTtl);
 
       // Always store in session cache
-      this.sessionCache.set(key, data, sessionTtl, tags, priority);
+      await this.sessionCache.set(key, data, sessionTtl, tags, priority);
 
       // Store in memory cache based on policy decision
       if (this.config.enableHierarchy && (targetLayer === 'memory' || priority === 'high')) {
-        this.memoryCache.set(key, data, memoryTtl, tags, priority);
+        await this.memoryCache.set(key, data, memoryTtl, tags, priority);
       }
 
       // Store chat responses in response cache service
@@ -94,6 +94,22 @@ export class CacheHierarchyService {
     } catch (error) {
       console.error('Unified cache storage error:', error);
     }
+  }
+
+  getCompressionStats() {
+    const memoryStats = this.memoryCache.getCompressionStats();
+    const sessionStats = this.sessionCache.getCompressionStats();
+    
+    return {
+      memory: memoryStats,
+      session: sessionStats,
+      combined: {
+        totalCompressed: memoryStats.totalCompressed + sessionStats.totalCompressed,
+        totalUncompressed: memoryStats.totalUncompressed + sessionStats.totalUncompressed,
+        compressionRatio: (memoryStats.compressionRatio + sessionStats.compressionRatio) / 2,
+        spaceSaved: memoryStats.spaceSaved + sessionStats.spaceSaved
+      }
+    };
   }
 
   private recordCacheHit(layer: 'memory' | 'session' | 'response', responseTime: number): void {

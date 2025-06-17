@@ -7,6 +7,11 @@ export interface CacheEntry<T = any> {
   lastAccessed: number;
   tags: string[];
   priority: 'low' | 'medium' | 'high';
+  compression?: {
+    isCompressed: boolean;
+    originalSize: number;
+    compressedSize: number;
+  };
 }
 
 export interface CacheMetrics {
@@ -16,6 +21,12 @@ export interface CacheMetrics {
   averageResponseTime: number;
   popularQueries: { query: string; hits: number }[];
   cacheEfficiency: number;
+  compressionStats?: {
+    totalCompressed: number;
+    totalUncompressed: number;
+    compressionRatio: number;
+    spaceSaved: number;
+  };
 }
 
 export interface CacheWarmingStrategy {

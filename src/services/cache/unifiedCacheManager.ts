@@ -129,20 +129,27 @@ export class UnifiedCacheManager {
     sessionStats: { size: number; hitRate: number };
     responseCacheStats: any;
     warmingStatus: { size: number; isWarming: boolean };
+    compressionStats?: any;
   } {
     const responseCacheStats = responseCacheService.getCacheStats();
     const warmingStatus = advancedCacheWarmingService.getQueueStatus();
+    const compressionStats = this.hierarchyService.getCompressionStats();
 
     // Update hit rates before calculating metrics
     CacheMetricsCalculator.updateHitRates(this.cacheStats);
 
-    return CacheMetricsCalculator.calculateExtendedMetrics(
+    const baseMetrics = CacheMetricsCalculator.calculateExtendedMetrics(
       this.memoryCache,
       this.sessionCache,
       this.cacheStats,
       responseCacheStats,
       warmingStatus
     );
+
+    return {
+      ...baseMetrics,
+      compressionStats
+    };
   }
 
   // Clear all cache layers

@@ -1,17 +1,19 @@
 
 import { CacheEntry } from '@/types/cache';
+import { CompressedCacheManager } from './compressedCacheManager';
 
 export class MemoryCacheManager {
   private cache = new Map<string, CacheEntry>();
   private readonly maxSize: number;
   private readonly defaultTtl: number;
+  private compressedCacheManager = new CompressedCacheManager();
 
   constructor(maxSize: number = 50, defaultTtl: number = 2 * 60 * 1000) {
     this.maxSize = maxSize;
     this.defaultTtl = defaultTtl;
   }
 
-  get<T>(key: string): T | null {
+  async get<T>(key: string): Promise<T | null> {
     const entry = this.cache.get(key);
     if (!entry || this.isExpired(entry)) {
       if (entry) this.cache.delete(key);
@@ -20,29 +22,38 @@ export class MemoryCacheManager {
     
     entry.accessCount++;
     entry.lastAccessed = Date.now();
+    
+    // Handle decompression if needed
+    if (entry.compression?.isCompressed) {
+      return await this.compressedCacheManager.decompressAndRetrieve<T>(entry);
+    }
+    
     return entry.data as T;
   }
 
-  set<T>(
+  async set<T>(
     key: string, 
     data: T, 
     ttl: number = this.defaultTtl,
     tags: string[] = [],
     priority: 'low' | 'medium' | 'high' = 'medium'
-  ): void {
+  ): Promise<void> {
     if (this.cache.size >= this.maxSize) {
       this.evictLeastRecentlyUsed();
     }
 
-    this.cache.set(key, {
+    // Create compressed cache entry
+    const compressedEntry = await this.compressedCacheManager.compressAndStore(
       data,
-      timestamp: Date.now(),
+      Date.now(),
       ttl,
-      accessCount: 1,
-      lastAccessed: Date.now(),
+      1,
+      Date.now(),
       tags,
       priority
-    });
+    );
+
+    this.cache.set(key, compressedEntry);
   }
 
   delete(key: string): void {
@@ -51,6 +62,7 @@ export class MemoryCacheManager {
 
   clear(): void {
     this.cache.clear();
+    this.compressedCacheManager.resetCompressionStats();
   }
 
   size(): number {
@@ -61,7 +73,7 @@ export class MemoryCacheManager {
     return this.cache.entries();
   }
 
-  cleanupExpired(): number {
+  async cleanupExpired(): Promise<number> {
     let cleanedCount = 0;
     for (const [key, entry] of this.cache.entries()) {
       if (this.isExpired(entry)) {
@@ -81,6 +93,10 @@ export class MemoryCacheManager {
       }
     }
     return invalidatedCount;
+  }
+
+  getCompressionStats() {
+    return this.compressedCacheManager.getCompressionStats();
   }
 
   private isExpired(entry: CacheEntry): boolean {
