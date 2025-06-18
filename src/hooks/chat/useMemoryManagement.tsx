@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useOptimizedChatPersistence } from './useOptimizedChatPersistence';
 import { useToast } from '@/hooks/use-toast';
-import { garbageCollectionService } from '@/services/cache/garbageCollectionService';
+import { garbageCollectionService } from '@/services/cache/gc/garbageCollectionService';
 
 interface MemoryConfig {
   maxMessagesInMemory: number;
