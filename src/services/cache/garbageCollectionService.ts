@@ -1,4 +1,11 @@
 
+// Define MemoryInfo interface since it's not available in all environments
+interface MemoryInfo {
+  usedJSHeapSize: number;
+  totalJSHeapSize: number;
+  jsHeapSizeLimit: number;
+}
+
 export interface GCMetrics {
   lastGCTime: number;
   gcCount: number;
@@ -113,8 +120,10 @@ export class GarbageCollectionService {
   private cleanupTemporaryResources(): void {
     // Clear any orphaned intervals or timeouts
     // This is a basic implementation - in a real app, you'd track these
-    const highestTimeoutId = setTimeout(() => {}, 0);
-    for (let i = 0; i < highestTimeoutId; i++) {
+    const highestTimeoutId = window.setTimeout(() => {}, 0);
+    const timeoutIdNumber = Number(highestTimeoutId);
+    
+    for (let i = 0; i < timeoutIdNumber; i++) {
       const element = document.querySelector(`[data-timeout-id="${i}"]`);
       if (element && !element.isConnected) {
         clearTimeout(i);
@@ -135,7 +144,7 @@ export class GarbageCollectionService {
 
   private getMemoryInfo(): MemoryInfo | null {
     if (typeof window !== 'undefined' && 'performance' in window && 'memory' in (window.performance as any)) {
-      return (window.performance as any).memory;
+      return (window.performance as any).memory as MemoryInfo;
     }
     return null;
   }
