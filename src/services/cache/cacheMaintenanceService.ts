@@ -1,7 +1,7 @@
 
 import { MemoryCacheManager } from './memoryCacheManager';
 import { SessionCacheManager } from './sessionCacheManager';
-import { garbageCollectionService } from './garbageCollectionService';
+import { garbageCollectionService } from './gc/garbageCollectionService';
 
 export class CacheMaintenanceService {
   private maintenanceInterval: number | null = null;

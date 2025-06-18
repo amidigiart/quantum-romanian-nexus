@@ -1,3 +1,4 @@
+
 import { MemoryCacheManager } from './memoryCacheManager';
 import { SessionCacheManager } from './sessionCacheManager';
 import { responseCacheService } from '../responseCacheService';
@@ -9,7 +10,7 @@ import { CacheHierarchyService } from './cacheHierarchyService';
 import { CacheInvalidationService } from './cacheInvalidationService';
 import { CacheMaintenanceService } from './cacheMaintenanceService';
 import { CachePolicyManager } from './policies/cachePolicyManager';
-import { garbageCollectionService } from './garbageCollectionService';
+import { garbageCollectionService } from './gc/garbageCollectionService';
 
 export type { UnifiedCacheConfig } from './unifiedCacheConfig';
 
