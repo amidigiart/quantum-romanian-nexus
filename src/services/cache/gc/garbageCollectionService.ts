@@ -4,6 +4,7 @@ import { MemoryMonitor } from './memoryMonitor';
 import { CleanupUtilities } from './cleanupUtilities';
 import { MetricsTracker } from './metricsTracker';
 import { ComponentMemoryTracker, ComponentMemoryUsage } from './componentMemoryTracker';
+import { weakReferenceManager } from './weakReferenceManager';
 
 const DEFAULT_COMPONENT_THRESHOLDS: ComponentMemoryThreshold[] = [
   { componentName: 'chat-messages', maxMemoryMB: 50, warningThresholdMB: 35, enabled: true },
@@ -22,6 +23,7 @@ export class GarbageCollectionService {
   private cleanupUtilities: CleanupUtilities;
   private metricsTracker: MetricsTracker;
   private componentTracker: ComponentMemoryTracker;
+  private serviceRef = {};
 
   constructor(config: Partial<GCConfig> = {}) {
     this.config = {
@@ -38,6 +40,9 @@ export class GarbageCollectionService {
     this.metricsTracker = new MetricsTracker();
     this.componentTracker = new ComponentMemoryTracker();
 
+    // Register this service with weak reference manager
+    weakReferenceManager.registerComponent(this.serviceRef, 'gc-service');
+
     this.componentTracker.updateThresholds(this.config.componentThresholds);
     this.startMemoryMonitoring();
   }
@@ -46,19 +51,22 @@ export class GarbageCollectionService {
     if (!this.config.enableAutoGC) return;
 
     // Check system memory usage every 30 seconds
-    this.memoryCheckInterval = window.setInterval(() => {
+    const memoryInterval = window.setInterval(() => {
       this.checkMemoryPressure();
     }, 30000);
+    weakReferenceManager.registerInterval(this.serviceRef, memoryInterval);
 
     // Check component memory usage every 15 seconds
-    this.componentCheckInterval = window.setInterval(() => {
+    const componentInterval = window.setInterval(() => {
       this.checkComponentMemoryPressure();
     }, 15000);
+    weakReferenceManager.registerInterval(this.serviceRef, componentInterval);
 
     // Force GC at regular intervals
-    this.gcInterval = window.setInterval(() => {
+    const gcInterval = window.setInterval(() => {
       this.forceGarbageCollection('scheduled');
     }, this.config.forceGCInterval);
+    weakReferenceManager.registerInterval(this.serviceRef, gcInterval);
   }
 
   private checkMemoryPressure(): void {
@@ -99,11 +107,11 @@ export class GarbageCollectionService {
     const memoryBefore = this.memoryMonitor.getCurrentMemoryUsage();
 
     try {
+      // Enhanced cleanup with WeakMap support
+      this.cleanupUtilities.performManualCleanup();
+      
       // Trigger browser GC if available (development only)
       this.cleanupUtilities.triggerBrowserGC();
-
-      // Manual cleanup strategies
-      this.cleanupUtilities.performManualCleanup();
 
       const endTime = performance.now();
       const memoryAfter = this.memoryMonitor.getCurrentMemoryUsage();
@@ -125,6 +133,10 @@ export class GarbageCollectionService {
 
   getMemoryStats() {
     return this.memoryMonitor.getMemoryStats();
+  }
+
+  getCleanupStats() {
+    return this.cleanupUtilities.getCleanupStats();
   }
 
   updateConfig(newConfig: Partial<GCConfig>): void {
@@ -165,18 +177,8 @@ export class GarbageCollectionService {
   }
 
   stopMonitoring(): void {
-    if (this.memoryCheckInterval) {
-      clearInterval(this.memoryCheckInterval);
-      this.memoryCheckInterval = undefined;
-    }
-    if (this.componentCheckInterval) {
-      clearInterval(this.componentCheckInterval);
-      this.componentCheckInterval = undefined;
-    }
-    if (this.gcInterval) {
-      clearInterval(this.gcInterval);
-      this.gcInterval = undefined;
-    }
+    // WeakMap-managed cleanup will handle intervals automatically
+    weakReferenceManager.cleanupComponent(this.serviceRef);
   }
 
   destroy(): void {
