@@ -1,7 +1,7 @@
 
 import { useState, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { requestDeduplicationService } from '@/services/requestDeduplicationService';
+import { enhancedRequestDeduplicationService } from '@/services/enhancedRequestDeduplicationService';
 
 export interface AIProviderConfig {
   provider: string;
@@ -21,11 +21,13 @@ export const useLazyMultiProviderBotResponses = () => {
       provider: config.provider,
       model: config.model,
       userId: user?.id,
-      conversationId
+      conversationId,
+      userExpertiseLevel: 'intermediate', // Could be dynamic
+      preferredResponseStyle: 'detailed' // Could be dynamic
     };
 
-    // Use request deduplication to prevent duplicate API calls
-    return requestDeduplicationService.deduplicateRequest(
+    // Use enhanced request deduplication with fingerprinting
+    return enhancedRequestDeduplicationService.deduplicateRequest(
       message,
       async () => {
         setIsGenerating(true);
@@ -57,7 +59,8 @@ export const useLazyMultiProviderBotResponses = () => {
           setIsGenerating(false);
         }
       },
-      requestContext
+      requestContext,
+      user?.id
     );
   }, [user]);
 
@@ -66,9 +69,11 @@ export const useLazyMultiProviderBotResponses = () => {
       provider: config.provider,
       model: config.model,
       userId: user?.id,
-      conversationId
+      conversationId,
+      userExpertiseLevel: 'intermediate',
+      preferredResponseStyle: 'detailed'
     };
-    return requestDeduplicationService.isRequestPending(message, requestContext);
+    return enhancedRequestDeduplicationService.isRequestPending(message, requestContext, user?.id);
   }, [user]);
 
   const cancelRequest = useCallback((message: string, config: AIProviderConfig, conversationId?: string) => {
@@ -76,16 +81,23 @@ export const useLazyMultiProviderBotResponses = () => {
       provider: config.provider,
       model: config.model,
       userId: user?.id,
-      conversationId
+      conversationId,
+      userExpertiseLevel: 'intermediate',
+      preferredResponseStyle: 'detailed'
     };
-    requestDeduplicationService.cancelRequest(message, requestContext);
+    enhancedRequestDeduplicationService.cancelRequest(message, requestContext, user?.id);
   }, [user]);
+
+  const getDeduplicationStats = useCallback(() => {
+    return enhancedRequestDeduplicationService.getDetailedStats();
+  }, []);
 
   return {
     generateResponseWithProvider,
     isGenerating,
     isRequestPending,
     cancelRequest,
-    getPendingRequestsCount: () => requestDeduplicationService.getPendingRequestsCount()
+    getPendingRequestsCount: () => enhancedRequestDeduplicationService.getPendingRequestsCount(),
+    getDeduplicationStats
   };
 };
