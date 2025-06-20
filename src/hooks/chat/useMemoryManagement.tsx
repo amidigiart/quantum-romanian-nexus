@@ -1,8 +1,10 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useOptimizedChatPersistence } from './useOptimizedChatPersistence';
 import { useToast } from '@/hooks/use-toast';
 import { garbageCollectionService } from '@/services/cache/gc/garbageCollectionService';
+import { ComponentMemoryThreshold } from '@/services/cache/gc/types';
 
 interface MemoryConfig {
   maxMessagesInMemory: number;
@@ -32,21 +34,28 @@ export const useMemoryManagement = (config: Partial<MemoryConfig> = {}) => {
     lastCleanup: null as Date | null,
     totalMemoryMB: 0,
     gcMetrics: garbageCollectionService.getGCMetrics(),
-    systemMemory: garbageCollectionService.getMemoryStats()
+    systemMemory: garbageCollectionService.getMemoryStats(),
+    componentStatus: garbageCollectionService.getComponentMemoryStatus()
   });
 
-  // Monitor memory usage with GC integration
+  // Monitor memory usage with GC and component tracking
   const updateMemoryUsage = useCallback(() => {
     const systemMemory = garbageCollectionService.getMemoryStats();
     const gcMetrics = garbageCollectionService.getGCMetrics();
+    const componentStatus = garbageCollectionService.getComponentMemoryStatus();
+    
+    // Update component memory usage based on current state
+    garbageCollectionService.updateComponentMemory('chat-messages', memoryUsage.messagesInMemory * 0.1); // Estimate 0.1MB per message
+    garbageCollectionService.updateComponentMemory('conversation-history', memoryUsage.conversationsInMemory * 1.5); // Estimate 1.5MB per conversation
     
     setMemoryUsage(prev => ({
       ...prev,
       totalMemoryMB: systemMemory.used,
       gcMetrics,
-      systemMemory
+      systemMemory,
+      componentStatus
     }));
-  }, []);
+  }, [memoryUsage.messagesInMemory, memoryUsage.conversationsInMemory]);
 
   // Enhanced cleanup with GC trigger
   const performCleanup = useCallback(async (forceCleanup = false) => {
@@ -111,15 +120,21 @@ export const useMemoryManagement = (config: Partial<MemoryConfig> = {}) => {
     };
   }, [memoryConfig.virtualizationBufferSize]);
 
-  // Enhanced memory pressure detection with GC integration
+  // Enhanced memory pressure detection with component thresholds
   const checkMemoryPressure = useCallback(() => {
     const systemMemory = garbageCollectionService.getMemoryStats();
+    const componentStatus = garbageCollectionService.getComponentMemoryStatus();
+    
     const isHighMemoryUsage = systemMemory.used > memoryConfig.gcThresholdMB;
     const isTooManyMessages = memoryUsage.messagesInMemory > memoryConfig.maxMessagesInMemory;
     const isTooManyConversations = memoryUsage.conversationsInMemory > memoryConfig.maxConversationsInMemory;
+    const hasComponentPressure = componentStatus.overThreshold.length > 0;
 
-    if (isHighMemoryUsage || isTooManyMessages || isTooManyConversations) {
+    if (isHighMemoryUsage || isTooManyMessages || isTooManyConversations || hasComponentPressure) {
       console.log('Memory pressure detected, performing cleanup and GC');
+      if (hasComponentPressure) {
+        console.log('Component pressure detected:', componentStatus.overThreshold.map(c => c.componentName).join(', '));
+      }
       performCleanup(true);
       garbageCollectionService.forceGarbageCollection('pressure');
     }
@@ -144,16 +159,39 @@ export const useMemoryManagement = (config: Partial<MemoryConfig> = {}) => {
     return success;
   }, [updateMemoryUsage, toast]);
 
+  // Component threshold management
+  const updateComponentThreshold = useCallback((threshold: ComponentMemoryThreshold) => {
+    garbageCollectionService.updateComponentThreshold(threshold);
+    updateMemoryUsage();
+    toast({
+      title: "Threshold Updated",
+      description: `Updated memory threshold for ${threshold.componentName}.`,
+    });
+  }, [updateMemoryUsage, toast]);
+
+  const removeComponentThreshold = useCallback((componentName: string) => {
+    garbageCollectionService.removeComponentThreshold(componentName);
+    updateMemoryUsage();
+    toast({
+      title: "Threshold Removed",
+      description: `Removed memory threshold for ${componentName}.`,
+    });
+  }, [updateMemoryUsage, toast]);
+
   // Track message and conversation counts
   const updateMessageCount = useCallback((count: number) => {
     setMemoryUsage(prev => ({ ...prev, messagesInMemory: count }));
+    // Update component memory for chat messages
+    garbageCollectionService.updateComponentMemory('chat-messages', count * 0.1);
   }, []);
 
   const updateConversationCount = useCallback((count: number) => {
     setMemoryUsage(prev => ({ ...prev, conversationsInMemory: count }));
+    // Update component memory for conversation history
+    garbageCollectionService.updateComponentMemory('conversation-history', count * 1.5);
   }, []);
 
-  // Enhanced periodic monitoring with GC
+  // Enhanced periodic monitoring with component tracking
   useEffect(() => {
     const interval = setInterval(() => {
       updateMemoryUsage();
@@ -179,7 +217,10 @@ export const useMemoryManagement = (config: Partial<MemoryConfig> = {}) => {
     updateConversationCount,
     checkMemoryPressure,
     forceGarbageCollection,
+    updateComponentThreshold,
+    removeComponentThreshold,
     isMemoryOptimized: memoryUsage.systemMemory.usagePercent < 50 && 
-                      memoryUsage.messagesInMemory < memoryConfig.maxMessagesInMemory
+                      memoryUsage.messagesInMemory < memoryConfig.maxMessagesInMemory &&
+                      memoryUsage.componentStatus.overThreshold.length === 0
   };
 };

@@ -15,11 +15,19 @@ export interface GCMetrics {
   averageGCTime: number;
 }
 
+export interface ComponentMemoryThreshold {
+  componentName: string;
+  maxMemoryMB: number;
+  warningThresholdMB: number;
+  enabled: boolean;
+}
+
 export interface GCConfig {
   memoryThresholdMB: number;
   forceGCInterval: number;
   maxMemoryUsagePercent: number;
   enableAutoGC: boolean;
+  componentThresholds: ComponentMemoryThreshold[];
 }
 
-export type GCReason = 'manual' | 'pressure' | 'scheduled' | 'cleanup';
+export type GCReason = 'manual' | 'pressure' | 'scheduled' | 'cleanup' | 'component-threshold';

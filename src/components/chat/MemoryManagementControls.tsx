@@ -4,9 +4,12 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Trash2, Activity, Database, Wifi, Cpu, Zap } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { Trash2, Activity, Database, Wifi, Cpu, Zap, Settings, AlertTriangle } from 'lucide-react';
 import { useMemoryManagement } from '@/hooks/chat/useMemoryManagement';
 import { websocketPool } from '@/services/websocketPoolManager';
+import { ComponentMemoryThreshold } from '@/services/cache/gc/types';
 
 export const MemoryManagementControls: React.FC = () => {
   const {
@@ -15,10 +18,14 @@ export const MemoryManagementControls: React.FC = () => {
     performCleanup,
     forceGarbageCollection,
     isMemoryOptimized,
-    checkMemoryPressure
+    checkMemoryPressure,
+    updateComponentThreshold,
+    removeComponentThreshold
   } = useMemoryManagement();
 
   const [wsStats, setWsStats] = React.useState(websocketPool.getPoolStats());
+  const [showComponentSettings, setShowComponentSettings] = React.useState(false);
+  const [editingThreshold, setEditingThreshold] = React.useState<ComponentMemoryThreshold | null>(null);
 
   // Update WebSocket stats periodically
   React.useEffect(() => {
@@ -36,6 +43,11 @@ export const MemoryManagementControls: React.FC = () => {
 
   const handleForceGC = () => {
     forceGarbageCollection();
+  };
+
+  const handleThresholdUpdate = (threshold: ComponentMemoryThreshold) => {
+    updateComponentThreshold(threshold);
+    setEditingThreshold(null);
   };
 
   const formatMemorySize = (mb: number) => {
@@ -63,6 +75,12 @@ export const MemoryManagementControls: React.FC = () => {
     if (percent < 50) return 'text-green-400';
     if (percent < 80) return 'text-yellow-400';
     return 'text-red-400';
+  };
+
+  const getComponentHealthColor = (usage: any) => {
+    if (usage.isOverThreshold) return 'text-red-400';
+    if (usage.isOverWarning) return 'text-yellow-400';
+    return 'text-green-400';
   };
 
   return (
@@ -97,6 +115,121 @@ export const MemoryManagementControls: React.FC = () => {
           Available: {formatMemorySize(memoryUsage.systemMemory.available)}
         </div>
       </div>
+
+      {/* Component Memory Usage */}
+      <div className="space-y-2">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <Database className="w-4 h-4 text-purple-400" />
+            <span className="text-sm text-gray-300">Component Memory</span>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowComponentSettings(!showComponentSettings)}
+          >
+            <Settings className="w-4 h-4" />
+          </Button>
+        </div>
+        
+        {memoryUsage.componentStatus.components.map((component) => (
+          <div key={component.componentName} className="space-y-1">
+            <div className="flex justify-between text-xs">
+              <div className="flex items-center gap-1">
+                <div className={`w-2 h-2 rounded-full ${getComponentHealthColor(component)}`} />
+                <span className="text-gray-300">{component.componentName}</span>
+                {component.isOverThreshold && <AlertTriangle className="w-3 h-3 text-red-400" />}
+              </div>
+              <span className="text-white">
+                {formatMemorySize(component.currentMemoryMB)}
+              </span>
+            </div>
+          </div>
+        ))}
+        
+        <div className="text-xs text-gray-400">
+          Total: {formatMemorySize(memoryUsage.componentStatus.totalComponentMemory)}
+        </div>
+      </div>
+
+      {/* Component Settings */}
+      {showComponentSettings && (
+        <div className="space-y-3 border-t border-white/10 pt-3">
+          <h4 className="text-sm font-medium text-white">Component Thresholds</h4>
+          
+          {memoryUsage.componentStatus.thresholds.map((threshold) => (
+            <div key={threshold.componentName} className="space-y-2 p-2 bg-white/5 rounded">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-gray-300">{threshold.componentName}</span>
+                <div className="flex items-center gap-1">
+                  <Switch 
+                    checked={threshold.enabled}
+                    onCheckedChange={(enabled) => 
+                      handleThresholdUpdate({ ...threshold, enabled })
+                    }
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setEditingThreshold(threshold)}
+                  >
+                    <Settings className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+              
+              {editingThreshold?.componentName === threshold.componentName && (
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      placeholder="Warning (MB)"
+                      value={editingThreshold.warningThresholdMB}
+                      onChange={(e) => setEditingThreshold({
+                        ...editingThreshold,
+                        warningThresholdMB: Number(e.target.value)
+                      })}
+                      className="text-xs"
+                    />
+                    <Input
+                      type="number"
+                      placeholder="Max (MB)"
+                      value={editingThreshold.maxMemoryMB}
+                      onChange={(e) => setEditingThreshold({
+                        ...editingThreshold,
+                        maxMemoryMB: Number(e.target.value)
+                      })}
+                      className="text-xs"
+                    />
+                  </div>
+                  <div className="flex gap-1">
+                    <Button
+                      size="sm"
+                      onClick={() => handleThresholdUpdate(editingThreshold)}
+                      className="text-xs"
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setEditingThreshold(null)}
+                      className="text-xs"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+              
+              <div className="text-xs text-gray-400">
+                Warning: {formatMemorySize(threshold.warningThresholdMB)} | 
+                Max: {formatMemorySize(threshold.maxMemoryMB)}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Cache Memory Usage */}
       <div className="space-y-2">
@@ -207,8 +340,8 @@ export const MemoryManagementControls: React.FC = () => {
         <div className="text-xs text-gray-500 border-t border-white/10 pt-2 space-y-1">
           <div>Conversations: {memoryUsage.conversationsInMemory}</div>
           <div>WS Memory: {formatMemorySize(wsStats.memoryUsage / (1024 * 1024))}</div>
-          <div>Buffer Size: {memoryConfig.virtualizationBufferSize}</div>
-          <div>GC Threshold: {memoryConfig.gcThresholdMB}MB</div>
+          <div>Components Over Threshold: {memoryUsage.componentStatus.overThreshold.length}</div>
+          <div>Components Over Warning: {memoryUsage.componentStatus.overWarning.length}</div>
         </div>
       )}
     </Card>
