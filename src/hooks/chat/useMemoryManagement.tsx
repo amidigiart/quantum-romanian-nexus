@@ -1,10 +1,10 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useOptimizedChatPersistence } from './useOptimizedChatPersistence';
 import { useToast } from '@/hooks/use-toast';
 import { garbageCollectionService } from '@/services/cache/gc/garbageCollectionService';
 import { ComponentMemoryThreshold } from '@/services/cache/gc/types';
+import { cleanupScheduler, CleanupJob } from '@/services/cache/cleanupScheduler';
 
 interface MemoryConfig {
   maxMessagesInMemory: number;
@@ -37,6 +37,7 @@ export const useMemoryManagement = (config: Partial<MemoryConfig> = {}) => {
     systemMemory: garbageCollectionService.getMemoryStats(),
     componentStatus: garbageCollectionService.getComponentMemoryStatus()
   });
+  const [cleanupSchedules, setCleanupSchedules] = useState<CleanupJob[]>([]);
 
   // Monitor memory usage with GC and component tracking
   const updateMemoryUsage = useCallback(() => {
@@ -99,6 +100,55 @@ export const useMemoryManagement = (config: Partial<MemoryConfig> = {}) => {
       return 0;
     }
   }, [user, memoryUsage.lastCleanup, memoryConfig.cleanupThresholdDays, cleanupOldData, toast]);
+
+  // Initialize default cleanup schedules
+  useEffect(() => {
+    if (user && cleanupSchedules.length === 0) {
+      // Create default daily cleanup schedule
+      cleanupScheduler.createSchedule(
+        'default-daily',
+        'Daily Memory Cleanup',
+        {
+          enabled: true,
+          interval: 24 * 60 * 60 * 1000, // 24 hours
+          maxAge: memoryConfig.cleanupThresholdDays,
+          triggerMemoryThreshold: 80,
+          triggerMessageCount: memoryConfig.maxMessagesInMemory,
+          triggerConversationCount: memoryConfig.maxConversationsInMemory,
+          enableGCAfterCleanup: true
+        },
+        performCleanup
+      );
+
+      // Create aggressive cleanup schedule for high memory usage
+      cleanupScheduler.createSchedule(
+        'aggressive-cleanup',
+        'High Memory Cleanup',
+        {
+          enabled: true,
+          interval: 2 * 60 * 60 * 1000, // 2 hours
+          maxAge: 7, // 7 days for aggressive cleanup
+          triggerMemoryThreshold: 90,
+          triggerMessageCount: memoryConfig.maxMessagesInMemory * 1.5,
+          triggerConversationCount: memoryConfig.maxConversationsInMemory * 1.2,
+          enableGCAfterCleanup: true
+        },
+        () => performCleanup(true)
+      );
+
+      setCleanupSchedules(cleanupScheduler.getAllSchedules());
+    }
+  }, [user, performCleanup, memoryConfig, cleanupSchedules.length]);
+
+  // Cleanup scheduler management
+  const handleScheduleChange = useCallback((schedules: CleanupJob[]) => {
+    setCleanupSchedules(schedules);
+  }, []);
+
+  // Enhanced cleanup function with schedule-aware callback
+  const scheduledCleanupCallback = useCallback(async () => {
+    return await performCleanup(true);
+  }, [performCleanup]);
 
   // Virtualization helper for message lists
   const getVirtualizedRange = useCallback((
@@ -208,6 +258,13 @@ export const useMemoryManagement = (config: Partial<MemoryConfig> = {}) => {
     }
   }, [user, memoryUsage.lastCleanup, performCleanup]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      cleanupScheduler.destroy();
+    };
+  }, []);
+
   return {
     memoryConfig,
     memoryUsage,
@@ -219,6 +276,9 @@ export const useMemoryManagement = (config: Partial<MemoryConfig> = {}) => {
     forceGarbageCollection,
     updateComponentThreshold,
     removeComponentThreshold,
+    cleanupSchedules,
+    handleScheduleChange,
+    scheduledCleanupCallback,
     isMemoryOptimized: memoryUsage.systemMemory.usagePercent < 50 && 
                       memoryUsage.messagesInMemory < memoryConfig.maxMessagesInMemory &&
                       memoryUsage.componentStatus.overThreshold.length === 0
