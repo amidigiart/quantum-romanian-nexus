@@ -1,6 +1,6 @@
-
 import { requestFingerprintingService, RequestFingerprintingService } from '../requestFingerprinting';
 import { intelligentRequestCancellationService } from '../intelligentRequestCancellationService';
+import { priorityRequestService } from '../priorityRequestService';
 import { DeduplicationStats, DEFAULT_DEDUPLICATION_CONFIG } from './types';
 import { FingerprintManager } from './fingerprintManager';
 import { RequestManager } from './requestManager';
@@ -71,7 +71,8 @@ export class EnhancedRequestDeduplicationService {
     message: string,
     requestFn: () => Promise<T>,
     context?: any,
-    userId?: string
+    userId?: string,
+    priority: 'critical' | 'high' | 'normal' | 'low' = 'normal'
   ): Promise<T> {
     const startTime = performance.now();
     this.statsManager.incrementTotalRequests();
@@ -105,21 +106,20 @@ export class EnhancedRequestDeduplicationService {
       }
     }
 
-    // Register with intelligent cancellation service
-    const abortController = intelligentRequestCancellationService.registerRequest(
-      requestKey,
+    // Use priority request service for new requests
+    const promise = priorityRequestService.submitRequest(
       message,
-      context,
-      userId,
-      'normal',
-      context?.conversationId
-    );
-
-    // Create new request with cancellation support
-    const promise = this.createCancellableRequest(requestFn, abortController).finally(() => {
+      requestFn,
+      {
+        priority,
+        userId,
+        conversationId: context?.conversationId,
+        context,
+        useDeduplication: false // Already handled here
+      }
+    ).finally(() => {
       // Clean up after request completes
       this.requestManager.removeRequest(requestKey);
-      intelligentRequestCancellationService.completeRequest(requestKey);
       
       const endTime = performance.now();
       const responseTime = endTime - startTime;
@@ -127,10 +127,21 @@ export class EnhancedRequestDeduplicationService {
     });
 
     // Store the pending request
-    this.requestManager.addRequest(requestKey, fingerprint, promise);
+    const fingerprint2 = this.fingerprintingService.generateFingerprint(message, context, userId);
+    this.requestManager.addRequest(requestKey, fingerprint2, promise);
 
-    console.log(`New request started with intelligent cancellation: ${requestKey}`);
+    console.log(`New request started with priority: ${priority} - ${requestKey}`);
     return promise;
+  }
+
+  async deduplicateRequestWithPriority<T>(
+    message: string,
+    requestFn: () => Promise<T>,
+    priority: 'critical' | 'high' | 'normal' | 'low',
+    context?: any,
+    userId?: string
+  ): Promise<T> {
+    return this.deduplicateRequest(message, requestFn, context, userId, priority);
   }
 
   isRequestPending(message: string, context?: any, userId?: string): boolean {
@@ -183,7 +194,8 @@ export class EnhancedRequestDeduplicationService {
       fingerprintIndexSize: this.fingerprintManager.getIndexSize(),
       fingerprintingStats: this.fingerprintingService.getCacheStats(),
       cancellationStats: intelligentRequestCancellationService.getCancellationStats(),
-      topRequests: this.requestManager.getTopRequests(10)
+      topRequests: this.requestManager.getTopRequests(10),
+      priorityQueueStats: priorityRequestService.getDetailedStats()
     };
   }
 
@@ -200,6 +212,20 @@ export class EnhancedRequestDeduplicationService {
 
   getFingerprintingConfig() {
     return this.fingerprintingService.getConfig();
+  }
+
+  // Priority queue management methods
+  getPriorityQueueStats() {
+    return priorityRequestService.getStats();
+  }
+
+  updatePriorityConfig(config: Partial<import('./types').DeduplicationConfig & import('../priorityRequestService').PriorityQueueConfig>): void {
+    if (config.REQUEST_TIMEOUT || config.MAX_PENDING_REQUESTS) {
+      // Update deduplication config
+      // Would need to implement in requestManager
+    }
+    
+    priorityRequestService.updateConfig(config);
   }
 }
 

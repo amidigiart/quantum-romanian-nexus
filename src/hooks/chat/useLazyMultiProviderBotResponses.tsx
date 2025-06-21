@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { enhancedRequestDeduplicationService } from '@/services/enhancedRequestDeduplicationService';
 import { intelligentRequestCancellationService } from '@/services/intelligentRequestCancellationService';
+import { priorityRequestService } from '@/services/priorityRequestService';
 
 export interface AIProviderConfig {
   provider: string;
@@ -15,19 +16,20 @@ export const useLazyMultiProviderBotResponses = () => {
   const generateResponseWithProvider = useCallback(async (
     message: string,
     config: AIProviderConfig,
-    conversationId?: string
+    conversationId?: string,
+    priority: 'critical' | 'high' | 'normal' | 'low' = 'normal'
   ): Promise<string> => {
     const requestContext = {
       provider: config.provider,
       model: config.model,
       userId: user?.id,
       conversationId,
-      userExpertiseLevel: 'intermediate', // Could be dynamic
-      preferredResponseStyle: 'detailed' // Could be dynamic
+      userExpertiseLevel: 'intermediate',
+      preferredResponseStyle: 'detailed'
     };
 
-    // Use enhanced request deduplication with intelligent cancellation
-    return enhancedRequestDeduplicationService.deduplicateRequest(
+    // Use enhanced request deduplication with priority support
+    return enhancedRequestDeduplicationService.deduplicateRequestWithPriority(
       message,
       async () => {
         setIsGenerating(true);
@@ -42,7 +44,8 @@ export const useLazyMultiProviderBotResponses = () => {
               provider: config.provider,
               model: config.model,
               conversationId,
-              userId: user?.id
+              userId: user?.id,
+              priority
             })
           });
 
@@ -59,10 +62,36 @@ export const useLazyMultiProviderBotResponses = () => {
           setIsGenerating(false);
         }
       },
+      priority,
       requestContext,
       user?.id
     );
   }, [user]);
+
+  // Convenience methods for different priorities
+  const generateCriticalResponse = useCallback((
+    message: string,
+    config: AIProviderConfig,
+    conversationId?: string
+  ) => {
+    return generateResponseWithProvider(message, config, conversationId, 'critical');
+  }, [generateResponseWithProvider]);
+
+  const generateHighPriorityResponse = useCallback((
+    message: string,
+    config: AIProviderConfig,
+    conversationId?: string
+  ) => {
+    return generateResponseWithProvider(message, config, conversationId, 'high');
+  }, [generateResponseWithProvider]);
+
+  const generateLowPriorityResponse = useCallback((
+    message: string,
+    config: AIProviderConfig,
+    conversationId?: string
+  ) => {
+    return generateResponseWithProvider(message, config, conversationId, 'low');
+  }, [generateResponseWithProvider]);
 
   const isRequestPending = useCallback((message: string, config: AIProviderConfig, conversationId?: string) => {
     const requestContext = {
@@ -111,8 +140,15 @@ export const useLazyMultiProviderBotResponses = () => {
     return intelligentRequestCancellationService.getCancellationStats();
   }, []);
 
+  const getPriorityQueueStats = useCallback(() => {
+    return priorityRequestService.getDetailedStats();
+  }, []);
+
   return {
     generateResponseWithProvider,
+    generateCriticalResponse,
+    generateHighPriorityResponse,
+    generateLowPriorityResponse,
     isGenerating,
     isRequestPending,
     cancelRequest,
@@ -120,6 +156,7 @@ export const useLazyMultiProviderBotResponses = () => {
     cancelConversationRequests,
     getPendingRequestsCount: () => enhancedRequestDeduplicationService.getPendingRequestsCount(),
     getDeduplicationStats,
-    getCancellationStats
+    getCancellationStats,
+    getPriorityQueueStats
   };
 };
