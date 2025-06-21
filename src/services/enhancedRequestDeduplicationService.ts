@@ -1,5 +1,5 @@
-
 import { requestFingerprintingService, RequestFingerprintingService, RequestFingerprint } from './requestFingerprinting';
+import { intelligentRequestCancellationService } from './intelligentRequestCancellationService';
 
 interface EnhancedPendingRequest {
   promise: Promise<any>;
@@ -174,13 +174,24 @@ export class EnhancedRequestDeduplicationService {
       }
     }
 
-    // Create new request
-    const promise = requestFn().finally(() => {
+    // Register with intelligent cancellation service
+    const abortController = intelligentRequestCancellationService.registerRequest(
+      requestKey,
+      message,
+      context,
+      userId,
+      'normal',
+      context?.conversationId
+    );
+
+    // Create new request with cancellation support
+    const promise = this.createCancellableRequest(requestFn, abortController).finally(() => {
       // Clean up after request completes
       const request = this.pendingRequests.get(requestKey);
       if (request) {
         this.removeFromFingerprintIndex(request.fingerprint, requestKey);
         this.pendingRequests.delete(requestKey);
+        intelligentRequestCancellationService.completeRequest(requestKey);
       }
       
       const endTime = performance.now();
@@ -203,8 +214,47 @@ export class EnhancedRequestDeduplicationService {
     this.addToFingerprintIndex(fingerprint, requestKey);
     this.updateStats();
 
-    console.log(`New request started with enhanced fingerprinting: ${requestKey}`);
+    console.log(`New request started with intelligent cancellation: ${requestKey}`);
     return promise;
+  }
+
+  private async createCancellableRequest<T>(
+    requestFn: () => Promise<T>,
+    abortController: AbortController
+  ): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      // Handle abort signal
+      if (abortController.signal.aborted) {
+        reject(new Error('Request was cancelled before starting'));
+        return;
+      }
+
+      // Set up abort listener
+      const abortListener = () => {
+        reject(new Error('Request was cancelled'));
+      };
+      abortController.signal.addEventListener('abort', abortListener);
+
+      // Execute the request
+      requestFn()
+        .then(result => {
+          if (abortController.signal.aborted) {
+            reject(new Error('Request was cancelled'));
+          } else {
+            resolve(result);
+          }
+        })
+        .catch(error => {
+          if (abortController.signal.aborted) {
+            reject(new Error('Request was cancelled'));
+          } else {
+            reject(error);
+          }
+        })
+        .finally(() => {
+          abortController.signal.removeEventListener('abort', abortListener);
+        });
+    });
   }
 
   isRequestPending(message: string, context?: any, userId?: string): boolean {
@@ -218,10 +268,22 @@ export class EnhancedRequestDeduplicationService {
     
     if (similarRequestKey && this.pendingRequests.has(similarRequestKey)) {
       const request = this.pendingRequests.get(similarRequestKey)!;
+      
+      // Cancel through intelligent cancellation service
+      intelligentRequestCancellationService.cancelRequest(similarRequestKey, 'manual');
+      
       this.removeFromFingerprintIndex(request.fingerprint, similarRequestKey);
       this.pendingRequests.delete(similarRequestKey);
       console.log(`Request cancelled: ${similarRequestKey}`);
     }
+  }
+
+  cancelUserRequests(userId: string): number {
+    return intelligentRequestCancellationService.cancelUserRequests(userId);
+  }
+
+  cancelConversationRequests(conversationId: string): number {
+    return intelligentRequestCancellationService.cancelConversationRequests(conversationId);
   }
 
   getPendingRequestsCount(): number {
@@ -239,6 +301,7 @@ export class EnhancedRequestDeduplicationService {
       pendingRequestsCount: this.getPendingRequestsCount(),
       fingerprintIndexSize: this.fingerprintIndex.size,
       fingerprintingStats: this.fingerprintingService.getCacheStats(),
+      cancellationStats: intelligentRequestCancellationService.getCancellationStats(),
       topRequests: Array.from(this.pendingRequests.values())
         .sort((a, b) => b.hits - a.hits)
         .slice(0, 10)

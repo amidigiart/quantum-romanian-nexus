@@ -1,7 +1,7 @@
-
 import { useState, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { enhancedRequestDeduplicationService } from '@/services/enhancedRequestDeduplicationService';
+import { intelligentRequestCancellationService } from '@/services/intelligentRequestCancellationService';
 
 export interface AIProviderConfig {
   provider: string;
@@ -26,7 +26,7 @@ export const useLazyMultiProviderBotResponses = () => {
       preferredResponseStyle: 'detailed' // Could be dynamic
     };
 
-    // Use enhanced request deduplication with fingerprinting
+    // Use enhanced request deduplication with intelligent cancellation
     return enhancedRequestDeduplicationService.deduplicateRequest(
       message,
       async () => {
@@ -88,8 +88,27 @@ export const useLazyMultiProviderBotResponses = () => {
     enhancedRequestDeduplicationService.cancelRequest(message, requestContext, user?.id);
   }, [user]);
 
+  const cancelAllUserRequests = useCallback(() => {
+    if (user?.id) {
+      const cancelledCount = enhancedRequestDeduplicationService.cancelUserRequests(user.id);
+      console.log(`Cancelled ${cancelledCount} requests for user ${user.id}`);
+      return cancelledCount;
+    }
+    return 0;
+  }, [user]);
+
+  const cancelConversationRequests = useCallback((conversationId: string) => {
+    const cancelledCount = enhancedRequestDeduplicationService.cancelConversationRequests(conversationId);
+    console.log(`Cancelled ${cancelledCount} requests for conversation ${conversationId}`);
+    return cancelledCount;
+  }, []);
+
   const getDeduplicationStats = useCallback(() => {
     return enhancedRequestDeduplicationService.getDetailedStats();
+  }, []);
+
+  const getCancellationStats = useCallback(() => {
+    return intelligentRequestCancellationService.getCancellationStats();
   }, []);
 
   return {
@@ -97,7 +116,10 @@ export const useLazyMultiProviderBotResponses = () => {
     isGenerating,
     isRequestPending,
     cancelRequest,
+    cancelAllUserRequests,
+    cancelConversationRequests,
     getPendingRequestsCount: () => enhancedRequestDeduplicationService.getPendingRequestsCount(),
-    getDeduplicationStats
+    getDeduplicationStats,
+    getCancellationStats
   };
 };

@@ -1,4 +1,3 @@
-
 export interface RequestFingerprint {
   contentHash: string;
   semanticHash: string;
@@ -182,6 +181,41 @@ export class RequestFingerprintingService {
   areSimilar(fp1: RequestFingerprint, fp2: RequestFingerprint): boolean {
     const similarity = this.calculateSimilarity(fp1, fp2);
     return similarity >= this.config.semanticSimilarityThreshold;
+  }
+
+  // Determine if a newer request should supersede an older one
+  shouldSupersede(olderFp: RequestFingerprint, newerFp: RequestFingerprint): boolean {
+    // If requests are from the same user and have semantic similarity
+    if (olderFp.userHash === newerFp.userHash) {
+      // Check if it's a refinement (similar semantic but different content)
+      const semanticSimilarity = olderFp.semanticHash === newerFp.semanticHash;
+      const contentDifferent = olderFp.contentHash !== newerFp.contentHash;
+      const contextSimilar = olderFp.contextHash === newerFp.contextHash;
+      
+      // Supersede if it's a refinement of the same question
+      if (semanticSimilarity && contentDifferent && contextSimilar) {
+        return true;
+      }
+      
+      // Supersede if the new request is much more recent (within conversation flow)
+      const timeDiff = newerFp.timestamp - olderFp.timestamp;
+      if (timeDiff < 30000 && this.areSimilar(olderFp, newerFp)) { // 30 seconds
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  // Check if a request is a follow-up or clarification
+  isFollowUp(previousFp: RequestFingerprint, currentFp: RequestFingerprint): boolean {
+    if (previousFp.userHash !== currentFp.userHash) return false;
+    
+    const timeDiff = currentFp.timestamp - previousFp.timestamp;
+    const isQuickFollowup = timeDiff < 10000; // 10 seconds
+    const hasContextSimilarity = previousFp.contextHash === currentFp.contextHash;
+    
+    return isQuickFollowup && hasContextSimilarity;
   }
 
   // Update configuration
