@@ -1,11 +1,11 @@
 
-import { requestFingerprintingService, RequestFingerprintingService } from './requestFingerprinting';
+import { requestFingerprintingService, RequestFingerprintingService, RequestFingerprint } from './requestFingerprinting';
 
 interface EnhancedPendingRequest {
   promise: Promise<any>;
   timestamp: number;
   requestKey: string;
-  fingerprint: import('./requestFingerprinting').RequestFingerprint;
+  fingerprint: RequestFingerprint;
   hits: number;
   lastAccessed: number;
 }

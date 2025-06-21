@@ -1,5 +1,5 @@
 
-interface RequestFingerprint {
+export interface RequestFingerprint {
   contentHash: string;
   semanticHash: string;
   contextHash: string;
