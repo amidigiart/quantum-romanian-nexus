@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { enhancedRequestDeduplicationService } from '@/services/enhancedRequestDeduplicationService';
 import { intelligentRequestCancellationService } from '@/services/intelligentRequestCancellationService';
 import { priorityRequestService } from '@/services/priorityRequestService';
+import { circuitBreakerManager } from '@/services/circuitBreaker';
 
 export interface AIProviderConfig {
   provider: string;
@@ -28,8 +29,14 @@ export const useLazyMultiProviderBotResponses = () => {
       preferredResponseStyle: 'detailed'
     };
 
-    // Use enhanced request deduplication with priority support
-    return enhancedRequestDeduplicationService.deduplicateRequestWithPriority(
+    // Check if circuit breaker is open for this provider
+    const circuitBreakerName = `${config.provider}-${config.model}`;
+    if (circuitBreakerManager.isCircuitOpen(circuitBreakerName)) {
+      throw new Error(`${config.provider} service is temporarily unavailable. Please try a different provider or wait a moment.`);
+    }
+
+    // Use priority request service with circuit breaker support
+    return priorityRequestService.submitRequest(
       message,
       async () => {
         setIsGenerating(true);
@@ -50,21 +57,27 @@ export const useLazyMultiProviderBotResponses = () => {
           });
 
           if (!response.ok) {
-            throw new Error('Failed to generate response');
+            throw new Error(`HTTP ${response.status}: Failed to generate response`);
           }
 
           const data = await response.json();
           return data.response || 'Sorry, I could not generate a response.';
         } catch (error) {
           console.error('Lazy multi-provider response error:', error);
-          throw new Error(`Error generating response with ${config.provider}: ${error}`);
+          throw error;
         } finally {
           setIsGenerating(false);
         }
       },
-      priority,
-      requestContext,
-      user?.id
+      {
+        priority,
+        userId: user?.id,
+        conversationId,
+        context: requestContext,
+        useDeduplication: true,
+        useCircuitBreaker: true,
+        circuitBreakerName
+      }
     );
   }, [user]);
 
@@ -144,6 +157,25 @@ export const useLazyMultiProviderBotResponses = () => {
     return priorityRequestService.getDetailedStats();
   }, []);
 
+  const getCircuitBreakerStats = useCallback(() => {
+    return circuitBreakerManager.getAllStats();
+  }, []);
+
+  const getProviderCircuitStatus = useCallback((config: AIProviderConfig) => {
+    const circuitBreakerName = `${config.provider}-${config.model}`;
+    return {
+      name: circuitBreakerName,
+      isOpen: circuitBreakerManager.isCircuitOpen(circuitBreakerName),
+      stats: circuitBreakerManager.getCircuitBreakerStats(circuitBreakerName)
+    };
+  }, []);
+
+  const resetCircuitBreaker = useCallback((config: AIProviderConfig) => {
+    const circuitBreakerName = `${config.provider}-${config.model}`;
+    circuitBreakerManager.removeCircuitBreaker(circuitBreakerName);
+    console.log(`Reset circuit breaker for ${circuitBreakerName}`);
+  }, []);
+
   return {
     generateResponseWithProvider,
     generateCriticalResponse,
@@ -157,6 +189,9 @@ export const useLazyMultiProviderBotResponses = () => {
     getPendingRequestsCount: () => enhancedRequestDeduplicationService.getPendingRequestsCount(),
     getDeduplicationStats,
     getCancellationStats,
-    getPriorityQueueStats
+    getPriorityQueueStats,
+    getCircuitBreakerStats,
+    getProviderCircuitStatus,
+    resetCircuitBreaker
   };
 };

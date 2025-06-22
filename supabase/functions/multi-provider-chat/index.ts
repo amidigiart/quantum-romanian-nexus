@@ -13,6 +13,7 @@ interface MultiProviderRequest {
   model: string;
   conversationId?: string;
   userId: string;
+  priority?: string;
 }
 
 serve(async (req) => {
@@ -21,28 +22,50 @@ serve(async (req) => {
   }
 
   try {
-    const { message, provider, model, conversationId, userId }: MultiProviderRequest = await req.json();
+    const { message, provider, model, conversationId, userId, priority }: MultiProviderRequest = await req.json();
     
     console.log(`Generating response with ${provider} ${model} for:`, message);
+    console.log(`Priority: ${priority || 'normal'}`);
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     let response: string;
+    let processingTime = 0;
+    const startTime = Date.now();
 
-    switch (provider) {
-      case 'openai':
-        response = await generateOpenAIResponse(message, model);
-        break;
-      case 'anthropic':
-        response = await generateAnthropicResponse(message, model);
-        break;
-      case 'perplexity':
-        response = await generatePerplexityResponse(message, model);
-        break;
-      default:
-        response = generateDefaultResponse(message);
+    try {
+      switch (provider) {
+        case 'openai':
+          response = await generateOpenAIResponse(message, model);
+          break;
+        case 'anthropic':
+          response = await generateAnthropicResponse(message, model);
+          break;
+        case 'perplexity':
+          response = await generatePerplexityResponse(message, model);
+          break;
+        default:
+          response = generateDefaultResponse(message);
+      }
+      processingTime = Date.now() - startTime;
+    } catch (error) {
+      processingTime = Date.now() - startTime;
+      
+      // Handle circuit breaker and provider errors gracefully
+      if (error.message.includes('API key not configured')) {
+        response = `⚠️ ${provider} is not configured. Please set up the API key or try a different provider.`;
+      } else if (error.name === 'CircuitBreakerOpenError') {
+        response = `🔄 ${provider} service is temporarily unavailable due to recent failures. Please try again in a few minutes or use a different provider.`;
+      } else if (error.message.includes('rate limit') || error.status === 429) {
+        response = `⏳ ${provider} rate limit exceeded. Please wait a moment before trying again.`;
+      } else if (error.status >= 500) {
+        response = `🔧 ${provider} is experiencing technical difficulties. Please try a different provider.`;
+      } else {
+        console.error(`Provider error for ${provider}:`, error);
+        response = `❌ Error with ${provider}: ${error.message}. Please try a different provider or check your configuration.`;
+      }
     }
 
     // Save to database if conversation exists
@@ -57,7 +80,10 @@ serve(async (req) => {
           quantum_data: {
             provider,
             model,
-            timestamp: new Date().toISOString()
+            priority: priority || 'normal',
+            processing_time_ms: processingTime,
+            timestamp: new Date().toISOString(),
+            had_error: processingTime === 0 || response.startsWith('⚠️') || response.startsWith('🔄') || response.startsWith('⏳') || response.startsWith('🔧') || response.startsWith('❌')
           }
         });
 
@@ -72,6 +98,8 @@ serve(async (req) => {
         response,
         provider,
         model,
+        priority: priority || 'normal',
+        processing_time_ms: processingTime,
         timestamp: new Date().toISOString()
       }),
       {
@@ -82,7 +110,11 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in multi-provider-chat function:', error);
     return new Response(
-      JSON.stringify({ error: 'Failed to generate response' }),
+      JSON.stringify({ 
+        error: 'Failed to generate response',
+        details: error.message,
+        timestamp: new Date().toISOString()
+      }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

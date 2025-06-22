@@ -2,6 +2,8 @@
 import { PriorityQueueManager } from './priorityQueueManager';
 import { PriorityRequest, RequestPriority, QueueStats, PriorityQueueConfig, QueueEventHandlers } from './types';
 import { enhancedRequestDeduplicationService } from '../enhancedRequestDeduplicationService';
+import { circuitBreakerManager } from '../circuitBreaker';
+import { CircuitBreakerOpenError } from '../circuitBreaker/types';
 
 export class PriorityRequestService {
   private queueManager: PriorityQueueManager;
@@ -42,6 +44,8 @@ export class PriorityRequestService {
       conversationId?: string;
       context?: any;
       useDeduplication?: boolean;
+      useCircuitBreaker?: boolean;
+      circuitBreakerName?: string;
       maxRetries?: number;
       timeoutMs?: number;
     } = {}
@@ -52,6 +56,8 @@ export class PriorityRequestService {
       conversationId,
       context,
       useDeduplication = true,
+      useCircuitBreaker = true,
+      circuitBreakerName,
       maxRetries,
       timeoutMs
     } = options;
@@ -59,11 +65,19 @@ export class PriorityRequestService {
     // Generate unique request ID
     const requestId = `req_${++this.requestCounter}_${Date.now()}`;
 
+    // Generate circuit breaker name if not provided
+    const cbName = circuitBreakerName || this.generateCircuitBreakerName(context);
+
+    // Wrap request function with circuit breaker if enabled
+    const wrappedRequestFn = useCircuitBreaker
+      ? () => circuitBreakerManager.executeWithCircuitBreaker(cbName, requestFn)
+      : requestFn;
+
     // Use deduplication if enabled
     if (useDeduplication) {
       return enhancedRequestDeduplicationService.deduplicateRequest(
         message,
-        () => this.executeWithPriority(requestId, message, requestFn, priority, {
+        () => this.executeWithPriority(requestId, message, wrappedRequestFn, priority, {
           userId,
           conversationId,
           context,
@@ -75,13 +89,23 @@ export class PriorityRequestService {
       );
     }
 
-    return this.executeWithPriority(requestId, message, requestFn, priority, {
+    return this.executeWithPriority(requestId, message, wrappedRequestFn, priority, {
       userId,
       conversationId,
       context,
       maxRetries,
       timeoutMs
     });
+  }
+
+  private generateCircuitBreakerName(context?: any): string {
+    if (context?.provider && context?.model) {
+      return `${context.provider}-${context.model}`;
+    }
+    if (context?.provider) {
+      return context.provider;
+    }
+    return 'default-circuit';
   }
 
   private executeWithPriority<T>(
@@ -110,7 +134,18 @@ export class PriorityRequestService {
         maxRetries: options.maxRetries,
         timeoutMs: options.timeoutMs,
         onSuccess: resolve,
-        onError: reject
+        onError: (error) => {
+          // Handle circuit breaker errors with special messaging
+          if (error instanceof CircuitBreakerOpenError) {
+            const friendlyError = new Error(
+              'Service is temporarily unavailable due to too many failures. Please try again later.'
+            );
+            friendlyError.name = 'ServiceUnavailableError';
+            reject(friendlyError);
+          } else {
+            reject(error);
+          }
+        }
       };
 
       const success = this.queueManager.enqueue(priorityRequest);
@@ -185,6 +220,7 @@ export class PriorityRequestService {
   getDetailedStats() {
     const basicStats = this.getStats();
     const config = this.getConfig();
+    const circuitBreakerStats = circuitBreakerManager.getAllStats();
     
     return {
       ...basicStats,
@@ -192,8 +228,25 @@ export class PriorityRequestService {
       totalQueueSize: this.getQueueSize(),
       processingCount: this.getProcessingRequestsCount(),
       queueUtilization: (this.getQueueSize() / config.maxQueueSize) * 100,
-      processingUtilization: (this.getProcessingRequestsCount() / config.maxConcurrentRequests) * 100
+      processingUtilization: (this.getProcessingRequestsCount() / config.maxConcurrentRequests) * 100,
+      circuitBreakers: circuitBreakerStats
     };
+  }
+
+  // Circuit breaker management methods
+  getCircuitBreakerStats(name?: string) {
+    if (name) {
+      return circuitBreakerManager.getCircuitBreakerStats(name);
+    }
+    return circuitBreakerManager.getAllStats();
+  }
+
+  isCircuitOpen(name: string): boolean {
+    return circuitBreakerManager.isCircuitOpen(name);
+  }
+
+  updateCircuitBreakerConfig(name: string, config: any): boolean {
+    return circuitBreakerManager.updateCircuitBreakerConfig(name, config);
   }
 }
 
