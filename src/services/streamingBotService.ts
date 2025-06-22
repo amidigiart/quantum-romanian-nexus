@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { requestDeduplicationService } from './requestDeduplicationService';
 
@@ -26,43 +25,23 @@ export class StreamingBotService {
     };
 
     try {
-      // Use request deduplication to prevent duplicate calls
-      await requestDeduplicationService.deduplicateRequest(
-        request.message,
-        async () => {
-          console.log('Starting streaming response for:', request.message);
-
-          const { data, error } = await supabase.functions.invoke('streaming-bot-response', {
-            body: request
-          });
-
-          if (error) {
-            console.error('Streaming bot service error:', error);
-            throw new Error('Failed to generate streaming response');
-          }
-
-          // Simulate streaming by splitting the response into chunks
-          const response = data.response;
-          const chunks = response.split('. ');
-          
-          // Stream chunks with realistic delays
-          for (let i = 0; i < chunks.length; i++) {
-            const chunk = i === chunks.length - 1 ? chunks[i] : chunks[i] + '. ';
-            
-            // Add realistic streaming delay
-            await new Promise(resolve => setTimeout(resolve, 150 + Math.random() * 100));
-            
-            onChunk(chunk);
-            console.log('Streamed chunk:', chunk.substring(0, 50) + '...');
-          }
-
-          console.log('Streaming response completed');
-          return response;
+      // Use enhanced streaming service for real-time responses
+      const { EnhancedStreamingBotService } = await import('./streaming/enhancedStreamingBotService');
+      
+      await EnhancedStreamingBotService.generateStreamingResponseViaEdgeFunction(
+        {
+          message: request.message,
+          conversationId: request.conversationId,
+          userId: request.userId,
+          context: request.context
         },
-        requestContext
+        onChunk,
+        (fullResponse: string) => {
+          console.log('Enhanced streaming completed');
+          onComplete();
+        },
+        onError
       );
-
-      onComplete();
 
     } catch (error) {
       console.error('Error in streaming bot service:', error);
