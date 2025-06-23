@@ -18,6 +18,9 @@ export interface BatchQueryOptions {
   failFast?: boolean;
 }
 
+// Define valid table names type
+type TableName = 'chat_conversations' | 'chat_messages' | 'profiles' | 'team_memberships' | 'teams' | 'user_preferences' | 'user_roles';
+
 export class OptimizedQueryExecutor {
   async executeQuery<T>(
     queryKey: string,
@@ -160,18 +163,18 @@ export class OptimizedQueryExecutor {
     );
   }
 
-  async executeBatchInsert<T>(
-    tableName: string,
-    records: T[],
+  async executeBatchInsert(
+    tableName: TableName,
+    records: any[],
     options: BatchQueryOptions = {}
-  ): Promise<T[]> {
+  ): Promise<any[]> {
     const {
       batchSize = 50,
       delayBetweenBatches = 100,
       failFast = false
     } = options;
 
-    const results: T[] = [];
+    const results: any[] = [];
     const errors: Error[] = [];
 
     for (let i = 0; i < records.length; i += batchSize) {
@@ -185,7 +188,7 @@ export class OptimizedQueryExecutor {
             .select();
 
           if (error) throw error;
-          return data as T[];
+          return data;
         });
 
         results.push(...(batchResult || []));
@@ -218,9 +221,9 @@ export class OptimizedQueryExecutor {
     return results;
   }
 
-  async executeBatchUpdate<T>(
-    tableName: string,
-    updates: Array<{ id: string; data: Partial<T> }>,
+  async executeBatchUpdate(
+    tableName: TableName,
+    updates: Array<{ id: string; data: any }>,
     options: BatchQueryOptions = {}
   ): Promise<void> {
     const {
@@ -305,7 +308,16 @@ export class OptimizedQueryExecutor {
   }
 
   async invalidateCache(tags: string[]): Promise<number> {
-    return queryResultCache.invalidateByTags(tags);
+    let invalidatedCount = 0;
+    for (const tag of tags) {
+      try {
+        const count = await queryResultCache.invalidateQueryPattern(tag);
+        invalidatedCount += count;
+      } catch (error) {
+        console.error(`Error invalidating cache for tag ${tag}:`, error);
+      }
+    }
+    return invalidatedCount;
   }
 }
 

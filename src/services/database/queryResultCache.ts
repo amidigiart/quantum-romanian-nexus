@@ -144,18 +144,46 @@ export class QueryResultCache {
   }
 
   async invalidateQueryPattern(pattern: string): Promise<number> {
-    const tags = [`query_pattern:${pattern}`];
-    return enhancedCacheManager.invalidateByTags(tags);
+    try {
+      const tags = [`query_pattern:${pattern}`];
+      const count = await enhancedCacheManager.invalidateByTags(tags);
+      return count;
+    } catch (error) {
+      console.error('Error invalidating query pattern:', error);
+      return 0;
+    }
   }
 
   async invalidateUserQueries(userId: string): Promise<number> {
-    const tags = [`user:${userId}`];
-    return enhancedCacheManager.invalidateByTags(tags);
+    try {
+      const tags = [`user:${userId}`];
+      const count = await enhancedCacheManager.invalidateByTags(tags);
+      return count;
+    } catch (error) {
+      console.error('Error invalidating user queries:', error);
+      return 0;
+    }
   }
 
   async invalidateConversationQueries(conversationId: string): Promise<number> {
-    const tags = [`conversation:${conversationId}`];
-    return enhancedCacheManager.invalidateByTags(tags);
+    try {
+      const tags = [`conversation:${conversationId}`];
+      const count = await enhancedCacheManager.invalidateByTags(tags);
+      return count;
+    } catch (error) {
+      console.error('Error invalidating conversation queries:', error);
+      return 0;
+    }
+  }
+
+  async invalidateByTags(tags: string[]): Promise<number> {
+    try {
+      const count = await enhancedCacheManager.invalidateByTags(tags);
+      return count;
+    } catch (error) {
+      console.error('Error invalidating by tags:', error);
+      return 0;
+    }
   }
 
   async preloadQuery<T>(
