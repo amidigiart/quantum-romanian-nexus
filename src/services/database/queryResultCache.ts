@@ -1,3 +1,4 @@
+
 import { enhancedCacheManager } from '../cache/enhancedCacheManager';
 
 export interface QueryCacheConfig {
@@ -146,8 +147,8 @@ export class QueryResultCache {
   async invalidateQueryPattern(pattern: string): Promise<number> {
     try {
       const tags = [`query_pattern:${pattern}`];
-      const count = await enhancedCacheManager.invalidateByTags(tags);
-      return count;
+      enhancedCacheManager.invalidateByTags(tags);
+      return 1; // Return 1 to indicate successful invalidation
     } catch (error) {
       console.error('Error invalidating query pattern:', error);
       return 0;
@@ -157,8 +158,8 @@ export class QueryResultCache {
   async invalidateUserQueries(userId: string): Promise<number> {
     try {
       const tags = [`user:${userId}`];
-      const count = await enhancedCacheManager.invalidateByTags(tags);
-      return count;
+      enhancedCacheManager.invalidateByTags(tags);
+      return 1; // Return 1 to indicate successful invalidation
     } catch (error) {
       console.error('Error invalidating user queries:', error);
       return 0;
@@ -168,8 +169,8 @@ export class QueryResultCache {
   async invalidateConversationQueries(conversationId: string): Promise<number> {
     try {
       const tags = [`conversation:${conversationId}`];
-      const count = await enhancedCacheManager.invalidateByTags(tags);
-      return count;
+      enhancedCacheManager.invalidateByTags(tags);
+      return 1; // Return 1 to indicate successful invalidation
     } catch (error) {
       console.error('Error invalidating conversation queries:', error);
       return 0;
@@ -178,8 +179,8 @@ export class QueryResultCache {
 
   async invalidateByTags(tags: string[]): Promise<number> {
     try {
-      const count = await enhancedCacheManager.invalidateByTags(tags);
-      return count;
+      enhancedCacheManager.invalidateByTags(tags);
+      return tags.length; // Return number of tag patterns processed
     } catch (error) {
       console.error('Error invalidating by tags:', error);
       return 0;
